@@ -3,7 +3,7 @@ use std::rc::Rc;
 use bytemuck::{AnyBitPattern, NoUninit};
 use crate::gl;
 use crate::state::GraphicsContext;
-use super::framebuffer::DrawTarget;
+use super::buffer::DrawTarget;
 use super::types::GLenum;
 
 #[repr(transparent)]

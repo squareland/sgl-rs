@@ -8,7 +8,7 @@ use crate::state::{BufferBit, GraphicsContext};
 use crate::state::draw::DrawMode;
 use crate::tessellator::formats::PositionTex;
 
-pub use crate::raw::framebuffer as raw;
+pub use crate::raw::buffer as raw;
 pub use raw::*;
 use crate::texture::{InternalTextureFormat, MagFilter, MinFilter, UploadPixelFormat, TextureWrap};
 

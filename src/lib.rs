@@ -1,4 +1,5 @@
 #![feature(decl_macro)]
+#![feature(adt_const_params)]
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -13,6 +14,7 @@ pub(crate) mod raw;
 pub mod debug;
 pub mod state;
 pub mod framebuffer;
+pub mod buffer;
 pub mod texture;
 pub mod matrix;
 pub mod tessellator;

@@ -17,6 +17,27 @@ pub trait DrawTarget {
 pub struct FramebufferId(pub NonZeroU32, pub(crate) GraphicsContext);
 #[repr(transparent)]
 pub struct RenderbufferId(pub NonZeroU32, pub(crate) GraphicsContext);
+#[repr(transparent)]
+pub struct BufferId<const K: BufferKind>(pub NonZeroU32, pub(crate) GraphicsContext);
+
+#[repr(u32)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
+pub enum BufferKind {
+    Array = gl::ARRAY_BUFFER,
+    AtomicCounter = gl::ATOMIC_COUNTER_BUFFER,
+    CopyRead = gl::COPY_READ_BUFFER,
+    CopyWrite = gl::COPY_WRITE_BUFFER,
+    DispatchIndirect = gl::DISPATCH_INDIRECT_BUFFER,
+    DrawIndirect = gl::DRAW_INDIRECT_BUFFER,
+    ElementArray = gl::ELEMENT_ARRAY_BUFFER,
+    PixelPack = gl::PIXEL_PACK_BUFFER,
+    PixelUnpack = gl::PIXEL_UNPACK_BUFFER,
+    Query = gl::QUERY_BUFFER,
+    ShaderStorage = gl::SHADER_STORAGE_BUFFER,
+    Texture = gl::TEXTURE_BUFFER,
+    TransformFeedback = gl::TRANSFORM_FEEDBACK,
+    Uniform = gl::UNIFORM_BUFFER,
+}
 
 impl FramebufferId {
     #[inline(always)]
@@ -42,6 +63,18 @@ impl RenderbufferId {
     }
 }
 
+impl<const K: BufferKind> BufferId<K> {
+    #[inline(always)]
+    pub fn bind(&self) -> BufferGuard<K> {
+        unsafe {
+            gl::BindBuffer(K as _, self.0.get());
+        }
+        BufferGuard {
+            buffer: self
+        }
+    }
+}
+
 impl Drop for FramebufferId {
     #[inline(always)]
     fn drop(&mut self) {
@@ -62,12 +95,26 @@ impl Drop for RenderbufferId {
     }
 }
 
+impl<const K: BufferKind> Drop for BufferId<K> {
+    #[inline(always)]
+    fn drop(&mut self) {
+        let id = self.0.get();
+        unsafe {
+            gl::DeleteBuffers(1, &id)
+        }
+    }
+}
+
 pub struct FramebufferGuard<'buffer> {
     _buffer: &'buffer FramebufferId
 }
 
 pub struct RenderbufferGuard<'buffer> {
     buffer: &'buffer RenderbufferId
+}
+
+pub struct BufferGuard<'buffer, const K: BufferKind> {
+    buffer: &'buffer BufferId<K>
 }
 
 impl<'buffer> FramebufferGuard<'buffer> {
@@ -94,6 +141,35 @@ impl<'buffer> FramebufferGuard<'buffer> {
     }
 }
 
+impl<'buffer, const K: BufferKind> BufferGuard<'buffer, K> {
+    #[inline(always)]
+    pub fn upload(&self, data: &[u8], mode: UploadMode) {
+        unsafe {
+            gl::BufferData(K as _, data.len() as _, data.as_ptr().cast(), mode as _);
+        }
+    }
+
+    #[inline(always)]
+    pub fn sub_upload(&self, offset: usize, data: &[u8]) {
+        unsafe {
+            gl::BufferSubData(K as _, offset as _, data.len() as _, data.as_ptr().cast());
+        }
+    }
+}
+
+#[repr(u32)]
+pub enum UploadMode {
+    StreamDraw = gl::STREAM_DRAW,
+    StreamRead = gl::STREAM_READ,
+    StreamCopy = gl::STREAM_COPY,
+    StaticDraw = gl::STATIC_DRAW,
+    StaticRead = gl::STATIC_READ,
+    StaticCopy = gl::STATIC_COPY,
+    DynamicDraw = gl::DYNAMIC_DRAW,
+    DynamicRead = gl::DYNAMIC_READ,
+    DynamicCopy = gl::DYNAMIC_COPY,
+}
+
 impl<'buffer> RenderbufferGuard<'buffer> {
     #[inline(always)]
     pub fn storage(&self, format: GLenum, width: u32, height: u32) {
@@ -117,6 +193,15 @@ impl<'buffer> Drop for RenderbufferGuard<'buffer> {
     fn drop(&mut self) {
         unsafe {
             gl::BindRenderbuffer(gl::RENDERBUFFER, 0)
+        }
+    }
+}
+
+impl<'buffer, const K: BufferKind> Drop for BufferGuard<'buffer, K> {
+    #[inline(always)]
+    fn drop(&mut self) {
+        unsafe {
+            gl::BindBuffer(K as _, 0)
         }
     }
 }

@@ -1,4 +1,4 @@
 pub mod texture;
-pub mod framebuffer;
+pub mod buffer;
 
 pub use crate::gl::types;

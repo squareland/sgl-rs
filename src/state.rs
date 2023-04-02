@@ -3,7 +3,7 @@ use std::num::NonZeroU32;
 use enumflags2::{bitflags, BitFlags};
 use crate::gl;
 use crate::debug::GlError;
-use crate::framebuffer::{FramebufferId, RenderbufferId};
+use crate::framebuffer::{BufferId, BufferKind, FramebufferId, RenderbufferId};
 use crate::state::blend::{Blend, DstFactor, SrcFactor};
 use crate::state::color::ColorMode;
 use crate::state::face::Face;
@@ -152,6 +152,20 @@ impl GraphicsContext {
     }
 
     #[inline(always)]
+    pub fn gen_buffer<const K: BufferKind>(&self) -> Result<BufferId<K>, GlError> {
+        let mut id = 0;
+        self.gen_buffers(std::slice::from_mut(&mut id));
+        NonZeroU32::new(id).map(move |i| BufferId(i, *self)).ok_or_else(GlError::get)
+    }
+
+    #[inline(always)]
+    pub fn gen_buffers(&self, slots: &mut [u32]) {
+        unsafe {
+            gl::GenBuffers(slots.len() as _, slots.as_mut_ptr().cast());
+        }
+    }
+
+    #[inline(always)]
     pub fn gen_texture(&self) -> Result<TextureId, GlError> {
         let mut id = 0;
         self.gen_textures(std::slice::from_mut(&mut id));
@@ -176,6 +190,13 @@ impl GraphicsContext {
     pub fn delete_renderbuffers(&self, slots: &mut [u32]) {
         unsafe {
             gl::DeleteRenderbuffers(slots.len() as _, slots.as_mut_ptr().cast());
+        }
+    }
+
+    #[inline(always)]
+    pub fn delete_buffers(&self, slots: &mut [u32]) {
+        unsafe {
+            gl::DeleteBuffers(slots.len() as _, slots.as_mut_ptr().cast());
         }
     }
 

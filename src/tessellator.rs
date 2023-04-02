@@ -1,4 +1,5 @@
 use std::ffi::c_void;
+use bytemuck::NoUninit;
 use cgmath::{Matrix4, };
 use crate::framebuffer::DrawTarget;
 use crate::state::blend::Blend;
@@ -10,6 +11,7 @@ use self::formats::{PositionColor, PositionTex};
 use super::gl;
 use super::gl::types::GLenum;
 
+#[derive(Copy, Clone)]
 pub struct Color(u8, u8, u8, u8);
 
 impl From<u32> for Color {
@@ -49,36 +51,43 @@ pub mod formats {
     use super::Color;
     use super::ElementUsage;
     use super::Vertex;
+    use super::VertexSource;
     use super::Element;
     use crate::gl;
     use crate::state::draw::DrawMode;
     use cgmath::{Matrix4, Matrix};
+    use bytemuck::NoUninit;
 
     macro_rules! vertex {
         ($name:ident($(#[$usage:expr] $field:ident : $ty:ty),*)) => {
             #[repr(C)]
+            #[derive(Copy, Clone)]
             pub struct $name {
                 $(pub $field: $ty),+
             }
 
+            unsafe impl NoUninit for $name {}
+
             impl Vertex for $name {
                 #[inline(always)]
-                fn upload(data: &[$name], mode: DrawMode, matrix: &Matrix4<f32>) {
-                    if data.len() > 0 {
+                fn draw<S: VertexSource<$name>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>) {
+                    let count = source.count();
+                    if count > 0 {
                         let size = std::mem::size_of::<Self>();
+                        let _guard = source.bind();
                         $(
                             let offset = field_offset::offset_of!(Self => $field);
                             let len = <$ty as Element>::len();
                             let gl = <$ty as Element>::gl();
                             let usage = $usage;
-                            usage.begin(len as _, gl, size as i32, offset.apply_ptr(data.as_ptr()).cast());
+                            usage.begin(len as _, gl, size as i32, offset.apply_ptr(source.start()).cast());
                         )*
                         unsafe {
                             gl::MatrixMode(gl::MODELVIEW);
                             gl::PushMatrix();
                             gl::LoadIdentity();
                             gl::MultMatrixf(matrix.as_ptr());
-                            gl::DrawArrays(mode as _, 0, data.len() as i32);
+                            gl::DrawArrays(mode as _, 0, count as i32);
                             gl::PopMatrix();
                         }
                         $(
@@ -93,6 +102,21 @@ pub mod formats {
                     Self {
                         $($field: $field.into()),*
                     }
+                }
+            }
+
+            unsafe impl<R> VertexSource<$name> for R where R: AsRef<[$name]> {
+                type Guard<'a> = () where Self: 'a;
+
+                fn start(&self) -> *const $name {
+                    self.as_ref().as_ptr().cast()
+                }
+
+                fn count(&self) -> usize {
+                    self.as_ref().len()
+                }
+
+                fn bind(&self) -> () {
                 }
             }
         };
@@ -130,8 +154,17 @@ pub mod formats {
     ));
 }
 
-pub trait Vertex: Sized {
-    fn upload(data: &[Self], mode: DrawMode, matrix: &Matrix4<f32>);
+pub trait Vertex: Sized + NoUninit {
+    fn draw<S: VertexSource<Self>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>);
+}
+
+pub unsafe trait VertexSource<V: Vertex> {
+    type Guard<'a> where Self: 'a;
+
+    fn start(&self) -> *const V;
+    fn count(&self) -> usize;
+
+    fn bind(&self) -> Self::Guard<'_>;
 }
 
 trait Element: Sized {
@@ -246,17 +279,17 @@ impl ElementUsage {
 }
 
 #[inline]
-pub fn draw<V: Vertex, D: DrawTarget>(mode: DrawMode, vertices: &[V], target: &mut D, matrix: &Matrix4<f32>) {
+pub fn draw<V: Vertex, S: VertexSource<V>, D: DrawTarget>(mode: DrawMode, vertices: S, target: &mut D, matrix: &Matrix4<f32>) {
     let _guard = target.bind();
-    V::upload(vertices, mode, matrix)
+    V::draw(vertices, mode, matrix)
 }
 
 #[inline]
-pub fn draw_textured<'a, V: Vertex, D: DrawTarget>(mode: DrawMode, vertices: &[V], target: &mut D, texture: &TextureGuard<'a>, matrix: &Matrix4<f32>) {
+pub fn draw_textured<'a, V: Vertex, S: VertexSource<V>, D: DrawTarget>(mode: DrawMode, vertices: S, target: &mut D, texture: &TextureGuard<'a>, matrix: &Matrix4<f32>) {
     let _guard = target.bind();
 
     texture.context().texture2d.enable();
-    V::upload(vertices, mode, matrix)
+    V::draw(vertices, mode, matrix)
 }
 
 #[inline]
