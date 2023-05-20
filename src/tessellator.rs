@@ -30,6 +30,14 @@ impl From<[u8; 4]> for Color {
     }
 }
 
+impl From<[f32; 4]> for Color {
+    #[inline(always)]
+    fn from(value: [f32; 4]) -> Self {
+        let [r, g, b, a] = value;
+        Self((r / 255.0) as u8, (g / 255.0) as u8, (b / 255.0) as u8, (a / 255.0) as u8)
+    }
+}
+
 impl Element for Color {
     #[inline(always)]
     fn size() -> usize {
@@ -83,12 +91,18 @@ pub mod formats {
                             usage.begin(len as _, gl, size as i32, offset.apply_ptr(source.start()).cast());
                         )*
                         unsafe {
+                            gl::MatrixMode(gl::PROJECTION);
+                            gl::PushMatrix();
+                            gl::LoadIdentity();
                             gl::MatrixMode(gl::MODELVIEW);
                             gl::PushMatrix();
                             gl::LoadIdentity();
                             gl::MultMatrixf(matrix.as_ptr());
                             gl::DrawArrays(mode as _, 0, count as i32);
                             gl::PopMatrix();
+                            gl::MatrixMode(gl::PROJECTION);
+                            gl::PopMatrix();
+                            gl::MatrixMode(gl::MODELVIEW);
                         }
                         $(
                             $usage.end();

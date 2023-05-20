@@ -157,6 +157,14 @@ impl Frame {
     pub fn display_height(&self) -> u32 {
         self.display_height
     }
+
+    pub fn aspect_ratio(&self) -> f32 {
+        self.display_width as f32 / self.display_height as f32
+    }
+
+    pub fn reset_viewport(&self) {
+        self.viewport(0, 0, self.display_width, self.display_height);
+    }
 }
 
 impl Deref for Frame {

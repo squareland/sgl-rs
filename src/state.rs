@@ -4,9 +4,11 @@ use enumflags2::{bitflags, BitFlags};
 use crate::gl;
 use crate::debug::GlError;
 use crate::framebuffer::{BufferId, BufferKind, FramebufferId, RenderbufferId};
+use crate::state::alpha::AlphaFunc;
 use crate::state::blend::{Blend, DstFactor, SrcFactor};
 use crate::state::color::ColorMode;
 use crate::state::face::Face;
+use crate::state::fog::FogMode;
 use crate::state::light::LightModel;
 use crate::state::shade::ShadeModel;
 use crate::texture::raw::TextureId;
@@ -87,6 +89,13 @@ impl GraphicsContext {
     pub fn depth_mask(&self, mask: bool) {
         unsafe {
             gl::DepthMask(mask as _);
+        }
+    }
+
+    #[inline(always)]
+    pub fn line_width(&self, width: f32) {
+        unsafe {
+            gl::LineWidth(width);
         }
     }
 
@@ -221,6 +230,13 @@ impl GraphicsContext {
     }
 
     #[inline(always)]
+    pub fn alpha_func(&self, func: AlphaFunc, reference: f32) {
+        unsafe {
+            gl::AlphaFunc(func as _, reference);
+        }
+    }
+
+    #[inline(always)]
     pub fn light_model(&self, model: LightModel) {
         match model {
             LightModel::Ambient { value } => {
@@ -253,6 +269,41 @@ impl GraphicsContext {
             gl::ColorMaterial(face as _, mode as _);
         }
     }
+
+    #[inline(always)]
+    pub fn fog_mode(&self, mode: FogMode) {
+        unsafe {
+            gl::Fogi(gl::FOG_MODE, mode as _);
+        }
+    }
+
+    #[inline(always)]
+    pub fn fog_density(&self, density: f32) {
+        unsafe {
+            gl::Fogf(gl::FOG_DENSITY, density);
+        }
+    }
+
+    #[inline(always)]
+    pub fn fog_start(&self, start: f32) {
+        unsafe {
+            gl::Fogf(gl::FOG_START, start);
+        }
+    }
+
+    #[inline(always)]
+    pub fn fog_end(&self, end: f32) {
+        unsafe {
+            gl::Fogf(gl::FOG_END, end);
+        }
+    }
+
+    #[inline(always)]
+    pub fn fog_color(&self, color: [f32; 4]) {
+        unsafe {
+            gl::Fogfv(gl::FOG_END, color.as_ptr());
+        }
+    }
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -278,6 +329,33 @@ impl<const E: GLenum> BooleanState<E> {
         unsafe {
             gl::Disable(E);
         }
+    }
+}
+
+pub mod alpha {
+    use crate::gl;
+
+    #[repr(u32)]
+    pub enum AlphaFunc {
+        Always = gl::ALWAYS,
+        Never = gl::NEVER,
+        Less = gl::LESS,
+        LessOrEqual = gl::LEQUAL,
+        Greater = gl::GREATER,
+        GreaterOrEqual = gl::GEQUAL,
+        Equal = gl::EQUAL,
+        NotEqual = gl::NOTEQUAL,
+    }
+}
+
+pub mod fog {
+    use crate::gl;
+
+    #[repr(u32)]
+    pub enum FogMode {
+        Linear = gl::LINEAR,
+        Exp = gl::EXP,
+        Exp2 = gl::EXP2,
     }
 }
 
