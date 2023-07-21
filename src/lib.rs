@@ -1,5 +1,6 @@
 #![feature(decl_macro)]
 #![feature(adt_const_params)]
+#![feature(structural_match)]
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};

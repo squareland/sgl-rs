@@ -449,6 +449,7 @@ pub mod draw {
 }
 
 pub mod light {
+    use std::marker::{ConstParamTy, StructuralEq, StructuralPartialEq};
     use crate::gl;
 
     #[repr(u32)]
@@ -474,7 +475,7 @@ pub mod light {
     }
 
     #[repr(u32)]
-    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+    #[derive(Copy, Clone)]
     pub enum Light {
         Zero = gl::LIGHT0,
         One = gl::LIGHT1,
@@ -485,6 +486,10 @@ pub mod light {
         Six = gl::LIGHT6,
         Seven = gl::LIGHT7
     }
+
+    impl StructuralEq for Light {}
+    impl StructuralPartialEq for Light {}
+    impl ConstParamTy for Light {}
 
     impl Light {
         #[inline(always)]
