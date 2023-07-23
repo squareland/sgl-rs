@@ -4,6 +4,7 @@ use enumflags2::{bitflags, BitFlags};
 use crate::gl;
 use crate::debug::GlError;
 use crate::framebuffer::{BufferId, BufferKind, FramebufferId, RenderbufferId};
+use crate::raw::display::DisplayListIter;
 use crate::state::alpha::AlphaFunc;
 use crate::state::blend::{Blend, DstFactor, SrcFactor};
 use crate::state::color::ColorMode;
@@ -171,6 +172,27 @@ impl GraphicsContext {
     pub fn gen_buffers(&self, slots: &mut [u32]) {
         unsafe {
             gl::GenBuffers(slots.len() as _, slots.as_mut_ptr().cast());
+        }
+    }
+
+    #[inline(always)] // GL 4+
+    pub fn gen_queries(&self, slots: &mut[u32]) {
+        unsafe {
+            gl::GenQueries(slots.len() as _, slots.as_mut_ptr().cast());
+        }
+    }
+
+    #[inline(always)]
+    pub fn gen_lists(&self, count: u32) -> Result<DisplayListIter, GlError> {
+        unsafe {
+            if let Some(start) = NonZeroU32::new(gl::GenLists(count as _)) {
+                Ok(DisplayListIter {
+                    range: start..start.saturating_add(count),
+                    context: *self
+                })
+            } else {
+                Err(GlError::get())
+            }
         }
     }
 

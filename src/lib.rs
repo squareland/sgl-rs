@@ -17,6 +17,7 @@ pub mod state;
 pub mod framebuffer;
 pub mod buffer;
 pub mod texture;
+pub mod display;
 pub mod matrix;
 pub mod tessellator;
 
