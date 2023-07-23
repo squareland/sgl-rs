@@ -9,7 +9,7 @@ use crate::texture::TextureGuard;
 use self::formats::{PositionColor, PositionTex};
 
 use super::gl;
-use super::gl::types::GLenum;
+use super::gl::GLenum;
 
 #[derive(Copy, Clone)]
 pub struct Color(u8, u8, u8, u8);

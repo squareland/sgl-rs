@@ -13,7 +13,7 @@ use crate::state::fog::FogMode;
 use crate::state::light::LightModel;
 use crate::state::shade::ShadeModel;
 use crate::texture::raw::TextureId;
-use super::raw::types::GLenum;
+use super::raw::GLenum;
 
 #[derive(PartialEq, Copy)]
 pub struct GraphicsContext {

@@ -4,7 +4,7 @@ use crate::gl;
 use crate::debug::gl_enum;
 use crate::state::GraphicsContext;
 use super::texture::TextureGuard;
-use super::types::GLenum;
+use super::GLenum;
 
 pub trait DrawTarget {
     type Guard<'a> where Self: 'a;

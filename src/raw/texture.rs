@@ -4,7 +4,7 @@ use bytemuck::{AnyBitPattern, NoUninit};
 use crate::gl;
 use crate::state::GraphicsContext;
 use super::buffer::DrawTarget;
-use super::types::GLenum;
+use super::GLenum;
 
 #[repr(transparent)]
 pub struct TextureId(pub NonZeroU32, pub(crate) GraphicsContext);

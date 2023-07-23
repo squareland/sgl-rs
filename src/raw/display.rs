@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 use std::ops::Range;
 use crate::gl;
-use crate::raw::types::GLenum;
+use crate::raw::GLenum;
 use crate::state::GraphicsContext;
 
 pub struct DisplayListIter {

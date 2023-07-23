@@ -1,7 +1,7 @@
 use core::cmp::{Eq, PartialEq};
 use std::ffi::{c_void, CStr};
 use super::gl;
-use super::raw::types::{GLenum, GLuint, GLsizei, GLchar};
+use super::raw::{GLenum, GLuint, GLsizei, GLchar};
 
 pub macro gl_enum(
     $(#[$attr:meta])*
