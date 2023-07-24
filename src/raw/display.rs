@@ -32,6 +32,7 @@ impl Drop for DisplayListIter {
     }
 }
 
+#[repr(transparent)]
 pub struct DisplayList(pub NonZeroU32, pub(crate) GraphicsContext);
 
 impl DisplayList {

@@ -85,6 +85,13 @@ impl GlError {
     pub fn get() -> Self {
         Self::from(unsafe { gl::GetError() })
     }
+
+    pub fn to_result(self) -> Result<(), GlError> {
+        match self {
+            GlError::NoError => Ok(()),
+            other => Err(other),
+        }
+    }
 }
 
 pub fn enable() {

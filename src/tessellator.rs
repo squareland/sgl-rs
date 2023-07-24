@@ -253,10 +253,10 @@ impl ElementUsage {
                     gl::EnableClientState(gl::COLOR_ARRAY);
                 }
                 ElementUsage::Texture(index) => {
-                    gl::ActiveTexture(gl::TEXTURE0 + *index);
+                    gl::ClientActiveTexture(gl::TEXTURE0 + *index);
                     gl::TexCoordPointer(count, ty, stride, ptr);
                     gl::EnableClientState(gl::TEXTURE_COORD_ARRAY);
-                    gl::ActiveTexture(gl::TEXTURE0);
+                    gl::ClientActiveTexture(gl::TEXTURE0);
                 }
                 ElementUsage::Generic(index) => {
                     gl::EnableVertexAttribArray(*index);
@@ -280,9 +280,9 @@ impl ElementUsage {
                     gl::DisableClientState(gl::COLOR_ARRAY);
                 }
                 ElementUsage::Texture(index) => {
-                    gl::ActiveTexture(gl::TEXTURE0 + *index);
+                    gl::ClientActiveTexture(gl::TEXTURE0 + *index);
                     gl::DisableClientState(gl::TEXTURE_COORD_ARRAY);
-                    gl::ActiveTexture(gl::TEXTURE0);
+                    gl::ClientActiveTexture(gl::TEXTURE0);
                 }
                 ElementUsage::Generic(index) => {
                     gl::DisableVertexAttribArray(*index);

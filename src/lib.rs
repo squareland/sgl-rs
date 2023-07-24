@@ -1,6 +1,7 @@
 #![feature(decl_macro)]
 #![feature(adt_const_params)]
 #![feature(structural_match)]
+#![feature(concat_idents)]
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -20,6 +21,8 @@ pub mod texture;
 pub mod display;
 pub mod matrix;
 pub mod tessellator;
+pub mod query;
+pub mod shader;
 
 static LOADED: AtomicBool = AtomicBool::new(false);
 

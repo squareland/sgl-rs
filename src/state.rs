@@ -4,6 +4,7 @@ use enumflags2::{bitflags, BitFlags};
 use crate::gl;
 use crate::debug::GlError;
 use crate::framebuffer::{BufferId, BufferKind, FramebufferId, RenderbufferId};
+use crate::query::QueryId;
 use crate::raw::display::DisplayListIter;
 use crate::state::alpha::AlphaFunc;
 use crate::state::blend::{Blend, DstFactor, SrcFactor};
@@ -175,7 +176,14 @@ impl GraphicsContext {
         }
     }
 
-    #[inline(always)] // GL 4+
+    #[inline(always)]
+    pub fn gen_query(&self) -> Result<QueryId, GlError> {
+        let mut id = 0;
+        self.gen_queries(std::slice::from_mut(&mut id));
+        NonZeroU32::new(id).map(move |i| QueryId(i, *self)).ok_or_else(GlError::get)
+    }
+
+    #[inline(always)]
     pub fn gen_queries(&self, slots: &mut[u32]) {
         unsafe {
             gl::GenQueries(slots.len() as _, slots.as_mut_ptr().cast());
