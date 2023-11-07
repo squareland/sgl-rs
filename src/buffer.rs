@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use cgmath::Matrix4;
 use crate::framebuffer::{BufferGuard, BufferId, BufferKind, UploadMode};
+use crate::shader::LinkedProgramId;
 use crate::state::draw::DrawMode;
 use crate::state::GraphicsContext;
 use crate::tessellator::{Vertex, VertexSource};
@@ -40,9 +41,9 @@ impl<V: Vertex> VertexBuffer<V> {
     }
 
     #[inline(always)]
-    pub fn draw(&self, mode: DrawMode, matrix: &Matrix4<f32>) {
+    pub fn draw(&self, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
         let _bound = self.id.bind();
-        V::draw(self, mode, matrix);
+        V::draw(self, mode, matrix, program);
     }
 }
 

@@ -10,6 +10,7 @@ use crate::tessellator::formats::PositionTex;
 
 pub use crate::raw::buffer as raw;
 pub use raw::*;
+use crate::shader::LinkedProgramId;
 use crate::texture::{InternalTextureFormat, MagFilter, MinFilter, UploadPixelFormat, TextureWrap};
 
 pub struct Framebuffer {
@@ -75,7 +76,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn render<T: DrawTarget>(&self, w: u32, h: u32, disable_blend: bool, target: &mut T, matrix: Matrix4<f32>) {
+    pub fn render<T: DrawTarget>(&self, w: u32, h: u32, disable_blend: bool, target: &mut T, matrix: Matrix4<f32>, program: Option<&LinkedProgramId<PositionTex>>) {
         let c = &self.context;
 
         c.color_mask(true, true, true, false);
@@ -108,7 +109,7 @@ impl Framebuffer {
             PositionTex::new([x + w, y + h, 0.0], [tw, 0.0]),
             PositionTex::new([x + w, y, 0.0], [tw, th]),
             PositionTex::new([x, y, 0.0], [0.0, th]),
-        ], target, &self.texture.bind(), &m);
+        ], target, &self.texture.bind(), &m, program);
 
         c.depth_mask(true);
         c.color_mask(true, true, true, true);

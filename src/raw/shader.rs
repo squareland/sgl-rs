@@ -1,11 +1,14 @@
 use std::ffi::CString;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
+use std::ops::Deref;
 use std::ptr::null_mut;
+use cgmath::{Vector2, Vector3, Vector4};
 use crate::debug::GlError;
 use crate::gl;
 use crate::gl::GLint;
 use crate::state::GraphicsContext;
+use crate::tessellator::Vertex;
 
 #[repr(transparent)]
 pub struct ShaderId(pub NonZeroU32, pub(crate) GraphicsContext);
@@ -71,6 +74,13 @@ impl GraphicsContext {
         }
     }
 
+    pub fn create_program(&self) -> Result<ProgramId, GlError> {
+        unsafe {
+            let id = gl::CreateProgram();
+            NonZeroU32::new(id).map(move |i| ProgramId(i, *self)).ok_or_else(GlError::get)
+        }
+    }
+
     pub fn shader_binary(&self, shaders: &[u32], format: BinaryFormat, binary: &[u8]) -> Result<(), GlError> {
         unsafe {
             gl::ShaderBinary(shaders.len() as _, shaders.as_ptr(), format.0, binary.as_ptr().cast(), binary.len() as _);
@@ -80,31 +90,37 @@ impl GraphicsContext {
 }
 
 impl ShaderId {
+    #[inline(always)]
+    pub fn id(&self) -> u32 {
+        self.0.get()
+    }
+
     pub fn binary(&self, format: BinaryFormat, binary: &[u8]) -> Result<(), GlError> {
-        let id = self.0.get();
+        let id = self.id();
         self.1.shader_binary(&[id], format, binary)
     }
 
     pub fn source(&self, source: &str) -> Result<(), GlError> {
         unsafe {
             let lengths = [source.len()];
-            gl::ShaderSource(self.0.get(), 1, source.len() as _, lengths.as_ptr().cast());
+            gl::ShaderSource(self.id(), 1, &source.as_ptr().cast(), lengths.as_ptr().cast());
             GlError::get().to_result()
         }
     }
 
     pub fn get_source(&self) -> Result<String, GlError> {
         let len = self.get(ShaderParam::SourceLength);
-        let mut source = Vec::with_capacity((len + 1) as _);
+        let mut source = Vec::with_capacity(len as _);
         unsafe {
-            gl::GetShaderSource(self.0.get(), len, null_mut(), source.as_mut_ptr());
+            gl::GetShaderSource(self.id(), len, null_mut(), source.as_mut_ptr());
+            source.set_len((len - 1).max(0) as _);
             GlError::get().to_result().map(|_| String::from_utf8_unchecked(std::mem::transmute(source)))
         }
     }
 
     pub fn compile(&self) -> Result<(), String> {
         unsafe {
-            gl::CompileShader(self.0.get());
+            gl::CompileShader(self.id());
         }
         let status = self.get(ShaderParam::CompileStatus);
         if status == gl::TRUE as _ {
@@ -116,23 +132,24 @@ impl ShaderId {
 
     pub fn get_info_log(&self) -> String {
         let len = self.get(ShaderParam::InfoLogLength);
-        let mut log = Vec::with_capacity((len + 1) as _);
+        let mut log = Vec::with_capacity(len as _);
         unsafe {
-            gl::GetShaderInfoLog(self.0.get(), len, null_mut(), log.as_mut_ptr());
+            gl::GetShaderInfoLog(self.id(), len, null_mut(), log.as_mut_ptr());
+            log.set_len((len - 1).max(0) as _);
             String::from_utf8_unchecked(std::mem::transmute(log))
         }
     }
 
     pub fn is_valid(&self) -> bool {
         unsafe {
-            gl::IsShader(self.0.get()) == gl::TRUE
+            gl::IsShader(self.id()) == gl::TRUE
         }
     }
 
     fn get(&self, param: ShaderParam) -> i32 {
         unsafe {
             let mut result = 0;
-            gl::GetShaderiv(self.0.get(), param as _, &mut result);
+            gl::GetShaderiv(self.id(), param as _, &mut result);
             result
         }
     }
@@ -141,7 +158,7 @@ impl ShaderId {
 impl Drop for ShaderId {
     #[inline(always)]
     fn drop(&mut self) {
-        let id = self.0.get();
+        let id = self.id();
         unsafe {
             gl::DeleteShader(id)
         }
@@ -151,48 +168,108 @@ impl Drop for ShaderId {
 #[repr(transparent)]
 pub struct ProgramId(pub NonZeroU32, pub(crate) GraphicsContext);
 
+#[repr(transparent)]
+pub struct LinkedProgramId<V>(ProgramId, PhantomData<V>);
+
+impl<V> Deref for LinkedProgramId<V> {
+    type Target = ProgramId;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl Drop for ProgramId {
     #[inline(always)]
     fn drop(&mut self) {
-        let id = self.0.get();
+        let id = self.id();
         unsafe {
             gl::DeleteProgram(id)
         }
     }
 }
 
-impl ProgramId {
-    pub fn uniform<'a, V>(&'a self, name: &str) -> Option<UniformLocation<'a, V>> where V: UniformValue {
+impl<V: Vertex> LinkedProgramId<V> {
+    pub fn uniform<U>(&self, name: &str) -> Option<UniformLocation<U, V>> where U: UniformValue {
         unsafe {
             let name = CString::new(name).unwrap();
-            let location = gl::GetUniformLocation(self.0.get(), name.as_ptr());
+            let location = gl::GetUniformLocation(self.id(), name.as_ptr());
             if location == -1 {
                 return None;
             }
             Some(UniformLocation {
+                program: self,
                 location,
                 _ty: PhantomData
             })
         }
     }
 
+    pub fn attribute<A>(&self, name: &str) -> Option<AttributeLocation<A, V>> {
+        unsafe {
+            let name = CString::new(name).unwrap();
+            let location = gl::GetAttribLocation(self.id(), name.as_ptr());
+            if location == -1 {
+                return None;
+            }
+            Some(AttributeLocation {
+                program: self,
+                location,
+                _ty: PhantomData
+            })
+        }
+    }
+
+    pub fn validate(&self) -> Result<String, GlError> {
+        unsafe {
+            gl::ValidateProgram(self.id());
+            let status = self.get(ProgramParam::ValidateStatus);
+            if status == gl::TRUE as _ {
+                Ok(self.get_info_log())
+            } else {
+                Err(GlError::get())
+            }
+        }
+    }
+}
+
+impl ProgramId {
+    #[inline(always)]
+    pub fn id(&self) -> u32 {
+        self.0.get()
+    }
+
     pub fn attach(&self, shader: &ShaderId) -> Result<(), GlError> {
         unsafe {
-            gl::AttachShader(self.0.get(), shader.0.get());
+            gl::AttachShader(self.id(), shader.0.get());
             GlError::get().to_result()
         }
     }
 
     pub fn detach(&self, shader: &ShaderId) -> Result<(), GlError> {
         unsafe {
-            gl::DetachShader(self.0.get(), shader.0.get());
+            gl::DetachShader(self.id(), shader.0.get());
             GlError::get().to_result()
+        }
+    }
+
+    pub fn link<V>(self) -> Result<LinkedProgramId<V>, String> where V: Vertex {
+        unsafe {
+            gl::LinkProgram(self.id());
+            let status = self.get(ProgramParam::LinkStatus);
+            if status == gl::TRUE as _ {
+                let linked = LinkedProgramId(self, PhantomData);
+                V::bind_attributes(&linked);
+                Ok(linked)
+            } else {
+                Err(self.get_info_log())
+            }
         }
     }
 
     pub fn binary(&self, format: BinaryFormat, binary: &[u8])  -> Result<(), GlError> {
         unsafe {
-            gl::ProgramBinary(self.0.get(), format.0, binary.as_ptr().cast(), binary.len() as _);
+            gl::ProgramBinary(self.id(), format.0, binary.as_ptr().cast(), binary.len() as _);
             GlError::get().to_result()
         }
     }
@@ -202,7 +279,8 @@ impl ProgramId {
         let mut binary = Vec::with_capacity(len as _);
         let mut format = 0;
         unsafe {
-            gl::GetProgramBinary(self.0.get(), len, null_mut(), &mut format, binary.as_mut_ptr());
+            gl::GetProgramBinary(self.id(), len, null_mut(), &mut format, binary.as_mut_ptr());
+            binary.set_len(len as _);
             GlError::get().to_result().map(|_| ProgramBinary {
                 format: BinaryFormat(format),
                 binary: std::mem::transmute(binary)
@@ -212,39 +290,45 @@ impl ProgramId {
 
     pub fn get_info_log(&self) -> String {
         let len = self.get(ProgramParam::InfoLogLength);
-        let mut log = Vec::with_capacity((len + 1) as _);
+        let mut log = Vec::with_capacity(len as _);
         unsafe {
-            gl::GetProgramInfoLog(self.0.get(), len, null_mut(), log.as_mut_ptr());
+            gl::GetProgramInfoLog(self.id(), len, null_mut(), log.as_mut_ptr());
+            log.set_len((len - 1).max(0) as _);
             String::from_utf8_unchecked(std::mem::transmute(log))
         }
     }
 
     pub fn is_valid(&self) -> bool {
         unsafe {
-            gl::IsProgram(self.0.get()) == gl::TRUE
-        }
-    }
-
-    pub fn validate(&self) {
-        unsafe {
-            gl::ValidateProgram(self.0.get());
-            let status = self.get(ProgramParam::ValidateStatus);
-
+            gl::IsProgram(self.id()) == gl::TRUE
         }
     }
 
     fn get(&self, param: ProgramParam) -> i32 {
         unsafe {
             let mut result = 0;
-            gl::GetProgramiv(self.0.get(), param as _, &mut result);
+            gl::GetProgramiv(self.id(), param as _, &mut result);
             result
         }
     }
 }
 
-pub struct UniformLocation<'a, V: UniformValue> {
+pub struct AttributeLocation<'a, A, V> {
+    program: &'a LinkedProgramId<V>,
     location: GLint,
-    _ty: PhantomData<&'a V>
+    _ty: PhantomData<A>
+}
+
+pub struct UniformLocation<'a, U, A> {
+    program: &'a LinkedProgramId<A>,
+    location: GLint,
+    _ty: PhantomData<&'a U>
+}
+
+impl<'a, U, V> UniformLocation<'a, U, V> where U: UniformValue {
+    pub fn set(&self, value: U) {
+        U::set(value, self.location);
+    }
 }
 
 pub trait UniformValue {
@@ -279,6 +363,14 @@ macro_rules! v {
             }
         }
 
+        impl UniformValue for Vector2<$ty> {
+            fn set(self, location: GLint) {
+                unsafe {
+                    gl::$glfn2(location, self.x, self.y);
+                }
+            }
+        }
+
         impl UniformValue for ($ty, $ty, $ty) {
             fn set(self, location: GLint) {
                 unsafe {
@@ -293,6 +385,14 @@ macro_rules! v {
                 unsafe {
                     let [x, y, z] = self;
                     gl::$glfn3(location, x, y, z);
+                }
+            }
+        }
+
+        impl UniformValue for Vector3<$ty> {
+            fn set(self, location: GLint) {
+                unsafe {
+                    gl::$glfn3(location, self.x, self.y, self.z);
                 }
             }
         }
@@ -315,6 +415,14 @@ macro_rules! v {
             }
         }
 
+        impl UniformValue for Vector4<$ty> {
+            fn set(self, location: GLint) {
+                unsafe {
+                    gl::$glfn4(location, self.x, self.y, self.z, self.w);
+                }
+            }
+        }
+
         impl UniformValue for &[$ty] {
             fn set(self, location: GLint) {
                 unsafe {
@@ -325,6 +433,15 @@ macro_rules! v {
         }
 
         impl UniformValue for &[[$ty; 2]] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    (concat_idents!($glfn2, v))(location, self.len() as _, self.as_ptr().cast());
+                }
+            }
+        }
+
+        impl UniformValue for &[Vector2<$ty>] {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
