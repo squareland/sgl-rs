@@ -505,7 +505,7 @@ pub mod light {
     }
 
     #[repr(u32)]
-    #[derive(Copy, Clone)]
+    #[derive(Copy, Clone, PartialEq, Eq)]
     pub enum Light {
         Zero = gl::LIGHT0,
         One = gl::LIGHT1,
@@ -517,8 +517,6 @@ pub mod light {
         Seven = gl::LIGHT7
     }
 
-    impl StructuralEq for Light {}
-    impl StructuralPartialEq for Light {}
     impl ConstParamTy for Light {}
 
     impl Light {
