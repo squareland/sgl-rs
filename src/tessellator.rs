@@ -129,7 +129,7 @@ pub mod formats {
                     let mut id = 0;
                     $(
                         unsafe {
-                            gl::BindAttribLocation(program.0, id, concat!(stringify!($field), "\0").as_ptr() as _);
+                            gl::BindAttribLocation(program.0.get(), id, concat!(stringify!($field), "\0").as_ptr() as _);
                             id += 1;
                         }
                     )*
