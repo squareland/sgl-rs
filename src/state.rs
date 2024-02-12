@@ -479,7 +479,7 @@ pub mod draw {
 }
 
 pub mod light {
-    use std::marker::{ConstParamTy, StructuralEq, StructuralPartialEq};
+    use std::marker::ConstParamTy;
     use crate::gl;
 
     #[repr(u32)]
