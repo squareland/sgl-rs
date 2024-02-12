@@ -1,4 +1,4 @@
-use std::marker::{ConstParamTy, StructuralEq, StructuralPartialEq};
+use std::marker::ConstParamTy;
 use std::num::NonZeroU32;
 use crate::gl;
 use crate::debug::gl_enum;
