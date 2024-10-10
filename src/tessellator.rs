@@ -64,7 +64,7 @@ pub mod formats {
     use super::Element;
     use crate::gl;
     use crate::state::draw::DrawMode;
-    use crate::shader::LinkedProgramId;
+    use crate::shader::{LinkedProgramId};
     use cgmath::{Matrix4, Matrix};
     use bytemuck::NoUninit;
 
@@ -93,30 +93,11 @@ pub mod formats {
                             usage.begin(len as _, gl, size as i32, offset.apply_ptr(source.start()).cast());
                         )*
                         unsafe {
-                            gl::MatrixMode(gl::PROJECTION);
-                            gl::PushMatrix();
-                            gl::LoadIdentity();
                             gl::MatrixMode(gl::MODELVIEW);
-                            gl::PushMatrix();
-                            gl::LoadIdentity();
-                            gl::MultMatrixf(matrix.as_ptr());
+                            gl::LoadMatrixf(matrix.as_ptr());
 
-                            let mut last_program = 0;
-                            gl::GetIntegerv(gl::CURRENT_PROGRAM, &mut last_program);
-
-                            let current_program = if let Some(program) = program {
-                                program.id()
-                            } else {
-                                0
-                            };
-                            gl::UseProgram(current_program);
+                            gl::UseProgram(program.map_or(0, |p| p.id()));
                             gl::DrawArrays(mode as _, 0, count as i32);
-                            gl::UseProgram(last_program as _);
-
-                            gl::PopMatrix();
-                            gl::MatrixMode(gl::PROJECTION);
-                            gl::PopMatrix();
-                            gl::MatrixMode(gl::MODELVIEW);
                         }
                         $(
                             $usage.end();
@@ -336,6 +317,8 @@ pub fn draw_textured<'a, V: Vertex, S: VertexSource<V>, D: DrawTarget>(mode: Dra
 #[inline]
 pub fn draw_gradient_rect<D: DrawTarget>(left: f32, top: f32, right: f32, bottom: f32, from: impl Into<Color> + Copy, to: impl Into<Color> + Copy, target: &mut D, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<PositionColor>>) {
     let c = target.context();
+    c.texture2d.disable();
+    c.alpha.disable();
     c.blend(Blend::default());
     c.shade_model(ShadeModel::Smooth);
     draw(DrawMode::Quads, &[
@@ -344,6 +327,11 @@ pub fn draw_gradient_rect<D: DrawTarget>(left: f32, top: f32, right: f32, bottom
         PositionColor::new([left, bottom, 0.0], to),
         PositionColor::new([right, bottom, 0.0], to),
     ], target, matrix, program);
+    let c = target.context();
+    c.shade_model(ShadeModel::Flat);
+    c.blend.disable();
+    c.alpha.enable();
+    c.texture2d.enable();
 }
 
 #[inline]
