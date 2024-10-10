@@ -1,9 +1,9 @@
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::ops::Deref;
 use std::ptr::null_mut;
-use cgmath::{Vector2, Vector3, Vector4};
+use cgmath::{Matrix, Matrix2, Matrix3, Matrix4, Vector2, Vector3, Vector4};
 use crate::debug::GlError;
 use crate::gl;
 use crate::gl::GLint;
@@ -15,7 +15,7 @@ pub struct ShaderId(pub NonZeroU32, pub(crate) GraphicsContext);
 
 #[repr(transparent)]
 #[derive(Debug)]
-pub struct BinaryFormat(u32);
+pub struct BinaryFormat(pub u32);
 
 #[derive(Debug)]
 pub struct ProgramBinary {
@@ -190,9 +190,8 @@ impl Drop for ProgramId {
 }
 
 impl<V: Vertex> LinkedProgramId<V> {
-    pub fn uniform<U>(&self, name: &str) -> Option<UniformLocation<U, V>> where U: UniformValue {
+    pub fn uniform<U>(&self, name: &CStr) -> Option<UniformLocation<U, V>> where U: UniformValue {
         unsafe {
-            let name = CString::new(name).unwrap();
             let location = gl::GetUniformLocation(self.id(), name.as_ptr());
             if location == -1 {
                 return None;
@@ -267,34 +266,34 @@ impl ProgramId {
         }
     }
 
-    pub fn binary(&self, format: BinaryFormat, binary: &[u8])  -> Result<(), GlError> {
+    pub fn binary(&self, binary: ProgramBinary)  -> Result<(), GlError> {
         unsafe {
-            gl::ProgramBinary(self.id(), format.0, binary.as_ptr().cast(), binary.len() as _);
+            gl::ProgramBinary(self.id(), binary.format.0, binary.binary.as_ptr().cast(), binary.binary.len() as _);
             GlError::get().to_result()
         }
     }
 
     pub fn get_binary(&self) -> Result<ProgramBinary, GlError> {
         let len = self.get(ProgramParam::BinaryLength);
-        let mut binary = Vec::with_capacity(len as _);
+        let mut binary = Vec::<u8>::with_capacity(len as _);
         let mut format = 0;
         unsafe {
-            gl::GetProgramBinary(self.id(), len, null_mut(), &mut format, binary.as_mut_ptr());
+            gl::GetProgramBinary(self.id(), len, null_mut(), &mut format, binary.as_mut_ptr().cast());
             binary.set_len(len as _);
             GlError::get().to_result().map(|_| ProgramBinary {
                 format: BinaryFormat(format),
-                binary: std::mem::transmute(binary)
+                binary
             })
         }
     }
 
     pub fn get_info_log(&self) -> String {
         let len = self.get(ProgramParam::InfoLogLength);
-        let mut log = Vec::with_capacity(len as _);
+        let mut log = Vec::<u8>::with_capacity(len as _);
         unsafe {
-            gl::GetProgramInfoLog(self.id(), len, null_mut(), log.as_mut_ptr());
+            gl::GetProgramInfoLog(self.id(), len, null_mut(), log.as_mut_ptr().cast());
             log.set_len((len - 1).max(0) as _);
-            String::from_utf8_unchecked(std::mem::transmute(log))
+            String::from_utf8_unchecked(log)
         }
     }
 
@@ -501,3 +500,136 @@ v!(f64: Uniform1d, Uniform2d, Uniform3d, Uniform4d);
 v!(f32: Uniform1f, Uniform2f, Uniform3f, Uniform4f);
 v!(i32: Uniform1i, Uniform2i, Uniform3i, Uniform4i);
 v!(u32: Uniform1ui, Uniform2ui, Uniform3ui, Uniform4ui);
+
+macro_rules! m {
+    ($ty: ty: $glfn2: ident, $glfn3: ident, $glfn4: ident) => {
+        impl UniformValue for Matrix2<$ty> {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn2(location, 1, 0, self.as_ptr())
+                }
+            }
+        }
+
+        impl UniformValue for &[[$ty; 2]; 2] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn2(location, 1, 0, self.as_ptr().cast())
+                }
+            }
+        }
+
+        impl UniformValue for &[$ty; 4] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn2(location, 1, 0, self.as_ptr())
+                }
+            }
+        }
+
+        impl UniformValue for &[Matrix2<$ty>] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn2(location, self.len() as _, 0, self.as_ptr().cast())
+                }
+            }
+        }
+
+        impl UniformValue for Matrix3<$ty> {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn3(location, 1, 0, self.as_ptr())
+                }
+            }
+        }
+
+        impl UniformValue for &[[$ty; 3]; 3] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn3(location, 1, 0, self.as_ptr().cast())
+                }
+            }
+        }
+
+        impl UniformValue for &[$ty; 9] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn3(location, 1, 0, self.as_ptr())
+                }
+            }
+        }
+
+        impl UniformValue for &[Matrix3<$ty>] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn3(location, self.len() as _, 0, self.as_ptr().cast())
+                }
+            }
+        }
+
+        impl UniformValue for &[[$ty; 9]] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn3(location, self.len() as _, 0, self.as_ptr().cast())
+                }
+            }
+        }
+
+        impl UniformValue for Matrix4<$ty> {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn4(location, 1, 0, self.as_ptr())
+                }
+            }
+        }
+
+        impl UniformValue for &[[$ty; 4]; 4] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn4(location, 1, 0, self.as_ptr().cast())
+                }
+            }
+        }
+
+        impl UniformValue for &[$ty; 16] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn4(location, 1, 0, self.as_ptr())
+                }
+            }
+        }
+
+        impl UniformValue for &[Matrix4<$ty>] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn4(location, self.len() as _, 0, self.as_ptr().cast())
+                }
+            }
+        }
+
+        impl UniformValue for &[[$ty; 16]] {
+            fn set(self, location: GLint) {
+                unsafe {
+                    use gl::*;
+                    $glfn4(location, self.len() as _, 0, self.as_ptr().cast())
+                }
+            }
+        }
+    };
+}
+
+m!(f32: UniformMatrix2fv, UniformMatrix3fv, UniformMatrix4fv);
+m!(f64: UniformMatrix2dv, UniformMatrix3dv, UniformMatrix4dv);
