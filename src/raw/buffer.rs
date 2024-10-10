@@ -22,7 +22,7 @@ pub struct RenderbufferId(pub NonZeroU32, pub(crate) GraphicsContext);
 pub struct BufferId<const K: BufferKind>(pub NonZeroU32, pub(crate) GraphicsContext);
 
 #[repr(u32)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, ConstParamTy)]
 pub enum BufferKind {
     Array = gl::ARRAY_BUFFER,
     AtomicCounter = gl::ATOMIC_COUNTER_BUFFER,
@@ -39,8 +39,6 @@ pub enum BufferKind {
     TransformFeedback = gl::TRANSFORM_FEEDBACK,
     Uniform = gl::UNIFORM_BUFFER,
 }
-
-impl ConstParamTy for BufferKind {}
 
 impl FramebufferId {
     #[inline(always)]

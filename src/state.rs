@@ -505,7 +505,7 @@ pub mod light {
     }
 
     #[repr(u32)]
-    #[derive(Copy, Clone, PartialEq, Eq)]
+    #[derive(Copy, Clone, PartialEq, Eq, ConstParamTy)]
     pub enum Light {
         Zero = gl::LIGHT0,
         One = gl::LIGHT1,
@@ -516,8 +516,6 @@ pub mod light {
         Six = gl::LIGHT6,
         Seven = gl::LIGHT7
     }
-
-    impl ConstParamTy for Light {}
 
     impl Light {
         #[inline(always)]
