@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Add, Deref, Mul, Sub};
 use std::rc::Rc;
 use cgmath::{Matrix4, Vector3};
 use enumflags2::BitFlags;
@@ -149,6 +149,10 @@ impl Frame {
 
     pub fn elapsed(&self) -> f32 {
         self.elapsed
+    }
+
+    pub fn lerp<V>(&self, from: V, to: V) -> V where V: Mul<f32, Output = V> + Add<Output=V> + Sub<Output=V> + Copy {
+        from + (to - from) * self.elapsed
     }
 
     pub fn display_width(&self) -> u32 {
