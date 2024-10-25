@@ -158,6 +158,24 @@ pub mod formats {
         #[ElementUsage::Texture(0)]
         uv: [f32; 2]
     ));
+    vertex!(PositionTexNormal(
+        #[ElementUsage::Position]
+        pos: [f32; 3],
+        #[ElementUsage::Texture(0)]
+        uv: [f32; 2],
+        #[ElementUsage::Normal]
+        normal: [i8; 3]
+    ));
+    vertex!(PositionTexNormalColor(
+        #[ElementUsage::Position]
+        pos: [f32; 3],
+        #[ElementUsage::Texture(0)]
+        uv: [f32; 2],
+        #[ElementUsage::Normal]
+        normal: [i8; 3],
+        #[ElementUsage::Color]
+        color: Color
+    ));
     vertex!(PositionNormal(
         #[ElementUsage::Position]
         pos: [f32; 3],
