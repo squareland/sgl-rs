@@ -71,7 +71,7 @@ pub mod formats {
     macro_rules! vertex {
         ($name:ident($(#[$usage:expr] $field:ident : $ty:ty),*)) => {
             #[repr(C)]
-            #[derive(Copy, Clone)]
+            #[derive(Copy, Clone, Debug)]
             pub struct $name {
                 $(pub $field: $ty),+
             }
