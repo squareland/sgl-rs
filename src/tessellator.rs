@@ -12,7 +12,7 @@ use self::formats::{PositionColor, PositionTex};
 use super::gl;
 use super::gl::GLenum;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Color(u8, u8, u8, u8);
 
 impl From<u32> for Color {
