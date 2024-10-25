@@ -5,6 +5,7 @@ use crate::shader::LinkedProgramId;
 use crate::state::draw::DrawMode;
 use crate::state::GraphicsContext;
 use crate::tessellator::{Vertex, VertexSource};
+use crate::texture::TextureGuard;
 
 pub struct VertexBuffer<V> {
     id: BufferId<{ BufferKind::Array }>,
@@ -43,6 +44,14 @@ impl<V: Vertex> VertexBuffer<V> {
     #[inline(always)]
     pub fn draw(&self, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
         let _bound = self.id.bind();
+        V::draw(self, mode, matrix, program);
+    }
+
+    #[inline(always)]
+    pub fn draw_textured<'a>(&self, mode: DrawMode, matrix: &Matrix4<f32>, texture: &TextureGuard<'a>, program: Option<&LinkedProgramId<V>>) {
+        let _bound = self.id.bind();
+
+        texture.context().texture2d.enable();
         V::draw(self, mode, matrix, program);
     }
 }
