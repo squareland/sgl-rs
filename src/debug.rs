@@ -94,29 +94,37 @@ impl GlError {
     }
 }
 
-pub fn enable() {
+type DebugCallback<'a> = dyn FnMut(DebugSource, DebugSeverity, DebugType, GlError, &'a CStr);
+
+pub fn enable<C>(callback: C) where C: FnMut(DebugSource, DebugSeverity, DebugType, GlError, &CStr) + 'static {
     extern "system" fn debug_callback(source: GLenum,
                                       gltype: GLenum,
                                       id: GLuint,
                                       severity: GLenum,
                                       length: GLsizei,
                                       message: *const GLchar,
-                                      _user_param: *mut c_void) {
+                                      callback: *mut c_void) {
 
         unsafe {
-            let source = DebugSource::from(source);
-            let ty = DebugType::from(gltype);
-            let severity = DebugSeverity::from(severity);
-            let id = GlError::from(id);
+            let mut callback = callback.cast::<Box<DebugCallback>>();
+            if let Some(callback) = callback.as_mut() {
+                let source = DebugSource::from(source);
+                let ty = DebugType::from(gltype);
+                let severity = DebugSeverity::from(severity);
+                let id = GlError::from(id);
 
-            let message: &[u8] = std::slice::from_raw_parts(message.cast(), length as _);
-            let message = CStr::from_bytes_with_nul_unchecked(message);
-            eprintln!("{:?} [{:?}] {:?}: {:?} ({:?})", source, severity, ty, id, message);
+                let message: &[u8] = std::slice::from_raw_parts(message.cast(), length as _);
+                let message = CStr::from_bytes_with_nul_unchecked(message);
+
+                callback(source, severity, ty, id, message);
+            }
         }
     }
 
+    let callback: Box<Box<DebugCallback>> = Box::new(Box::new(callback));
+
     unsafe {
         gl::Enable(gl::DEBUG_OUTPUT);
-        gl::DebugMessageCallback(Some(debug_callback), std::ptr::null_mut());
+        gl::DebugMessageCallback(Some(debug_callback), Box::into_raw(callback).cast());
     }
 }
