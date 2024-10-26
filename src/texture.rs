@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::path::Path;
 use image::{ColorType, ImageFormat};
 pub use crate::raw::texture as raw;
@@ -84,13 +85,13 @@ fn blend_colors<const N: usize>(colors: [u32; N], has_alpha: bool) -> u32 {
     }
 }
 
-fn generate_mipmap(levels: u32, width: u32, data: Option<&[u8]>) -> Vec<Vec<u8>> {
+fn generate_mipmap<'a>(levels: u32, width: u32, data: Option<&'a [u8]>) -> Vec<Cow<[u8]>> {
     let mut layers = Vec::with_capacity(levels as usize + 1);
     let Some(data) = data else {
         return layers;
     };
 
-    layers.push(Vec::from(data));
+    layers.push(Cow::Borrowed(data));
 
     let data = bytemuck::cast_slice::<_, u32>(data);
 
@@ -120,7 +121,8 @@ fn generate_mipmap(levels: u32, width: u32, data: Option<&[u8]>) -> Vec<Vec<u8>>
 
         unsafe {
             let (ptr, len, capacity) = current.into_raw_parts();
-            layers.push(Vec::from_raw_parts(ptr as *mut u8, len * 4, capacity * 4));
+            let layer = Vec::from_raw_parts(ptr as *mut u8, len * 4, capacity * 4);
+            layers.push(Cow::Owned(layer));
         }
     }
 
@@ -130,27 +132,26 @@ fn generate_mipmap(levels: u32, width: u32, data: Option<&[u8]>) -> Vec<Vec<u8>>
 pub fn allocate<C: Into<GraphicsContext>>(width: u32, height: u32, data: Option<&[u8]>, params: &TextureParameters, c: C) -> TextureId {
     let texture = c.into().gen_texture().expect("Unable to allocate texture");
     let bound = texture.bind();
-    if let Some(mipmap) = params.mipmap {
-        let levels = mipmap.levels;
-        if levels >= 0 {
-            bound.max_level(levels);
-            bound.min_lod(0);
-            bound.max_lod(levels);
-            bound.lod_bias(0.0);
-
-            let layers = generate_mipmap(levels as u32, width, data);
-
-            for i in 0..levels as u32 {
-                bound.set_image(i, InternalTextureFormat::RGBA8, width >> i, height >> i, UploadPixelFormat::RGBA, layers.get(i as usize).map(Vec::as_slice));
-            }
-        }
-    }
     bound.wrap_s(params.wrap_s);
     bound.wrap_t(params.wrap_t);
     bound.wrap_r(params.wrap_r);
     bound.min_filter(params.min_filter);
     bound.mag_filter(params.mag_filter);
-    bound.set_image(0, InternalTextureFormat::RGBA8, width, height, UploadPixelFormat::RGBA, data);
+    let levels = params.mipmap.map(|m| m.levels).unwrap_or_default();
+    if levels >= 0 {
+        bound.max_level(levels);
+        bound.min_lod(0);
+        bound.max_lod(levels);
+        bound.lod_bias(0.0);
+
+        let layers = generate_mipmap(levels as u32, width, data);
+
+        for i in 0..=levels as u32 {
+            bound.set_image(i, InternalTextureFormat::RGBA8, width >> i, height >> i, UploadPixelFormat::RGBA, layers.get(i as usize).map(Cow::as_ref));
+        }
+    } else {
+        bound.set_image(0, InternalTextureFormat::RGBA8, width, height, UploadPixelFormat::RGBA, data);
+    }
     drop(bound);
     texture
 }
