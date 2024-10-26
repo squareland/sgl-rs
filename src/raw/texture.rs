@@ -47,6 +47,11 @@ impl<'texture> TextureGuard<'texture> {
     }
 
     #[inline(always)]
+    unsafe fn parameter_f32(&self, parameter: GLenum, value: f32) {
+        gl::TexParameterf(gl::TEXTURE_2D, parameter, value as _)
+    }
+
+    #[inline(always)]
     unsafe fn get_level_parameter_i32(&self, level: u32, parameter: GLenum, output: &mut [i32]) {
         gl::GetTexLevelParameteriv(gl::TEXTURE_2D, level as _, parameter, output.as_mut_ptr())
     }
@@ -105,6 +110,34 @@ impl<'texture> TextureGuard<'texture> {
     }
 
     #[inline(always)]
+    pub fn max_level(&self, level: i32) {
+        unsafe {
+            self.parameter_i32(gl::TEXTURE_MAX_LEVEL, level as _)
+        }
+    }
+
+    #[inline(always)]
+    pub fn min_lod(&self, lod: i32) {
+        unsafe {
+            self.parameter_i32(gl::TEXTURE_MIN_LOD, lod as _)
+        }
+    }
+
+    #[inline(always)]
+    pub fn max_lod(&self, lod: i32) {
+        unsafe {
+            self.parameter_i32(gl::TEXTURE_MAX_LOD, lod as _)
+        }
+    }
+
+    #[inline(always)]
+    pub fn lod_bias(&self, bias: f32) {
+        unsafe {
+            self.parameter_f32(gl::TEXTURE_LOD_BIAS, bias as _)
+        }
+    }
+
+    #[inline(always)]
     pub fn copy_sub_image<T: DrawTarget>(&self, level: u32, x_offset: u32, y_offset: u32, x: u32, y: u32, w: u32, h: u32, source: &T) {
         let _bound = source.bind();
         unsafe {
@@ -140,6 +173,7 @@ impl<'texture> TextureGuard<'texture> {
 }
 
 #[repr(u32)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum UploadPixelFormat {
     Red = gl::RED,
     RG = gl::RG,
@@ -158,6 +192,7 @@ pub enum UploadPixelFormat {
 }
 
 #[repr(u32)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum DownloadPixelFormat {
     StencilIndex = gl::STENCIL_INDEX,
     DepthComponent = gl::DEPTH_COMPONENT,
@@ -181,6 +216,7 @@ pub enum DownloadPixelFormat {
 }
 
 #[repr(u32)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum BaseTextureFormat {
     Red = gl::RED,
     RG = gl::RG,
@@ -189,6 +225,7 @@ pub enum BaseTextureFormat {
 }
 
 #[repr(u32)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum InternalTextureFormat {
     R8 = gl::R8,
     R8SNorm = gl::R8_SNORM,
@@ -322,7 +359,7 @@ impl InternalTextureFormat {
 }
 
 #[repr(u32)]
-#[derive(Default)]
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum MinFilter {
     Nearest = gl::NEAREST,
     Linear = gl::LINEAR,
@@ -334,7 +371,7 @@ pub enum MinFilter {
 }
 
 #[repr(u32)]
-#[derive(Default)]
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum MagFilter {
     Nearest = gl::NEAREST,
     #[default]
@@ -342,7 +379,7 @@ pub enum MagFilter {
 }
 
 #[repr(u32)]
-#[derive(Default)]
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum TextureWrap {
     ClampToEdge = gl::CLAMP_TO_EDGE,
     ClampToBorder = gl::CLAMP_TO_BORDER,

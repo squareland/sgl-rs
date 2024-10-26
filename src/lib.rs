@@ -2,6 +2,7 @@
 #![feature(adt_const_params)]
 #![feature(structural_match)]
 #![feature(concat_idents)]
+#![feature(vec_into_raw_parts)]
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
