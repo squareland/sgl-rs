@@ -85,7 +85,7 @@ fn blend_colors<const N: usize>(colors: [u32; N], has_alpha: bool) -> u32 {
     }
 }
 
-fn generate_mipmap<'a>(levels: u32, width: u32, data: Option<&'a [u8]>) -> Vec<Cow<[u8]>> {
+fn generate_mipmap(levels: u32, width: u32, data: Option<&[u8]>) -> Vec<Cow<[u8]>> {
     let mut layers = Vec::with_capacity(levels as usize + 1);
     let Some(data) = data else {
         return layers;
