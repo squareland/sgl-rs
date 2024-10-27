@@ -1,5 +1,6 @@
 use std::ops::{Add, Deref, Mul, Sub};
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 use cgmath::{Matrix4, Vector3};
 use enumflags2::BitFlags;
 use crate::gl;
@@ -137,6 +138,7 @@ impl<'a> Texture<'a> for &'a Framebuffer {
 
 pub struct Frame {
     pub context: GraphicsContext,
+    pub start: Instant,
     elapsed: f32,
     display_width: u32,
     display_height: u32
@@ -144,11 +146,15 @@ pub struct Frame {
 
 impl Frame {
     pub unsafe fn new<C: Into<GraphicsContext>>(c: C, elapsed: f32, display_width: u32, display_height: u32) -> Self {
-        Self { context: c.into(), elapsed, display_width, display_height }
+        Self { context: c.into(), start: Instant::now(), elapsed, display_width, display_height }
     }
 
     pub fn elapsed(&self) -> f32 {
         self.elapsed
+    }
+
+    pub fn frame_duration(&self) -> Duration {
+        Instant::now().duration_since(self.start)
     }
 
     pub fn lerp<V>(&self, from: V, to: V) -> V where V: Mul<f32, Output = V> + Add<Output=V> + Sub<Output=V> + Copy {
