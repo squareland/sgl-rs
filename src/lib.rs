@@ -18,6 +18,7 @@ pub mod debug;
 pub mod state;
 pub mod framebuffer;
 pub mod buffer;
+pub mod array;
 pub mod texture;
 pub mod display;
 pub mod matrix;

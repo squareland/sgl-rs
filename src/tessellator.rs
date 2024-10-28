@@ -79,29 +79,37 @@ pub mod formats {
             unsafe impl NoUninit for $name {}
 
             impl Vertex for $name {
+                unsafe fn enable_client_state(start: *const $name) {
+                    let size = std::mem::size_of::<Self>();
+                    $(
+                        let offset = field_offset::offset_of!(Self => $field);
+                        let len = <$ty as Element>::len();
+                        let gl = <$ty as Element>::gl();
+                        let usage = $usage;
+                        usage.begin(len as _, gl, size as i32, offset.apply_ptr(start).cast());
+                    )*
+                }
+
+                unsafe fn disable_client_state() {
+                    $(
+                        $usage.end();
+                    )*
+                }
+
                 #[inline(always)]
                 fn draw<S: VertexSource<$name>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>) {
                     let count = source.count();
                     if count > 0 {
-                        let size = std::mem::size_of::<Self>();
                         let _guard = source.bind();
-                        $(
-                            let offset = field_offset::offset_of!(Self => $field);
-                            let len = <$ty as Element>::len();
-                            let gl = <$ty as Element>::gl();
-                            let usage = $usage;
-                            usage.begin(len as _, gl, size as i32, offset.apply_ptr(source.start()).cast());
-                        )*
                         unsafe {
+                            Self::enable_client_state(source.start());
                             gl::MatrixMode(gl::MODELVIEW);
                             gl::LoadMatrixf(matrix.as_ptr());
 
                             gl::UseProgram(program.map_or(0, |p| p.id()));
                             gl::DrawArrays(mode as _, 0, count as i32);
+                            Self::disable_client_state();
                         }
-                        $(
-                            $usage.end();
-                        )*
                     }
                 }
 
@@ -193,6 +201,10 @@ pub mod formats {
 }
 
 pub trait Vertex: Sized + NoUninit {
+    unsafe fn enable_client_state(start: *const Self);
+
+    unsafe fn disable_client_state();
+
     fn draw<S: VertexSource<Self>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>);
 
     fn bind_attributes(program: &LinkedProgramId<Self>);

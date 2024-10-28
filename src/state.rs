@@ -5,6 +5,7 @@ use crate::gl;
 use crate::debug::GlError;
 use crate::framebuffer::{BufferId, BufferKind, FramebufferId, RenderbufferId};
 use crate::query::QueryId;
+use crate::raw::array::VertexArrayId;
 use crate::raw::display::DisplayListIter;
 use crate::state::alpha::AlphaFunc;
 use crate::state::blend::{Blend, DstFactor, SrcFactor};
@@ -173,6 +174,20 @@ impl GraphicsContext {
     pub fn gen_buffers(&self, slots: &mut [u32]) {
         unsafe {
             gl::GenBuffers(slots.len() as _, slots.as_mut_ptr().cast());
+        }
+    }
+
+    #[inline(always)]
+    pub fn gen_vertex_array(&self) -> Result<VertexArrayId, GlError> {
+        let mut id = 0;
+        self.gen_vertex_arrays(std::slice::from_mut(&mut id));
+        NonZeroU32::new(id).map(move |i| VertexArrayId(i, *self)).ok_or_else(GlError::get)
+    }
+
+    #[inline(always)]
+    pub fn gen_vertex_arrays(&self, slots: &mut [u32]) {
+        unsafe {
+            gl::GenVertexArrays(slots.len() as _, slots.as_mut_ptr().cast());
         }
     }
 
