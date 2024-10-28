@@ -1,6 +1,6 @@
 use std::ffi::c_void;
 use bytemuck::NoUninit;
-use cgmath::{Matrix4, };
+use cgmath::{Matrix4, Vector1, Vector2, Vector3, Vector4};
 use crate::framebuffer::DrawTarget;
 use crate::shader::LinkedProgramId;
 use crate::state::blend::Blend;
@@ -65,7 +65,7 @@ pub mod formats {
     use crate::gl;
     use crate::state::draw::DrawMode;
     use crate::shader::{LinkedProgramId};
-    use cgmath::{Matrix4, Matrix};
+    use cgmath::{Matrix4, Matrix, Vector3};
     use bytemuck::NoUninit;
 
     macro_rules! vertex {
@@ -152,23 +152,23 @@ pub mod formats {
 
     vertex!(Position(
         #[ElementUsage::Position]
-        pos: [f32; 3]
+        pos: Vector3<f32>
     ));
     vertex!(PositionColor(
         #[ElementUsage::Position]
-        pos: [f32; 3],
+        pos: Vector3<f32>,
         #[ElementUsage::Color]
         color: Color
     ));
     vertex!(PositionTex(
         #[ElementUsage::Position]
-        pos: [f32; 3],
+        pos: Vector3<f32>,
         #[ElementUsage::Texture(0)]
         uv: [f32; 2]
     ));
     vertex!(PositionTexNormal(
         #[ElementUsage::Position]
-        pos: [f32; 3],
+        pos: Vector3<f32>,
         #[ElementUsage::Texture(0)]
         uv: [f32; 2],
         #[ElementUsage::Normal]
@@ -176,7 +176,7 @@ pub mod formats {
     ));
     vertex!(PositionTexNormalColor(
         #[ElementUsage::Position]
-        pos: [f32; 3],
+        pos: Vector3<f32>,
         #[ElementUsage::Texture(0)]
         uv: [f32; 2],
         #[ElementUsage::Normal]
@@ -186,13 +186,13 @@ pub mod formats {
     ));
     vertex!(PositionNormal(
         #[ElementUsage::Position]
-        pos: [f32; 3],
+        pos: Vector3<f32>,
         #[ElementUsage::Normal]
         normal: [i8; 3]
     ));
     vertex!(PositionTexColor(
         #[ElementUsage::Position]
-        pos: [f32; 3],
+        pos: Vector3<f32>,
         #[ElementUsage::Texture(0)]
         uv: [f32; 2],
         #[ElementUsage::Color]
@@ -230,6 +230,54 @@ trait Element: Sized {
     }
 
     fn gl() -> GLenum;
+}
+
+impl<E> Element for Vector4<E> where E: Element {
+    #[inline(always)]
+    fn len() -> usize {
+        4
+    }
+
+    #[inline(always)]
+    fn gl() -> GLenum {
+        E::gl()
+    }
+}
+
+impl<E> Element for Vector3<E> where E: Element {
+    #[inline(always)]
+    fn len() -> usize {
+        3
+    }
+
+    #[inline(always)]
+    fn gl() -> GLenum {
+        E::gl()
+    }
+}
+
+impl<E> Element for Vector2<E> where E: Element {
+    #[inline(always)]
+    fn len() -> usize {
+        2
+    }
+
+    #[inline(always)]
+    fn gl() -> GLenum {
+        E::gl()
+    }
+}
+
+impl<E> Element for Vector1<E> where E: Element {
+    #[inline(always)]
+    fn len() -> usize {
+        1
+    }
+
+    #[inline(always)]
+    fn gl() -> GLenum {
+        E::gl()
+    }
 }
 
 impl<E, const N: usize> Element for [E; N] where E: Element {
