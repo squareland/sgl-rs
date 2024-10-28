@@ -172,7 +172,7 @@ pub mod formats {
         #[ElementUsage::Texture(0)]
         uv: [f32; 2],
         #[ElementUsage::Normal]
-        normal: [i8; 3]
+        normal: Vector3<i8>
     ));
     vertex!(PositionTexNormalColor(
         #[ElementUsage::Position]
@@ -180,7 +180,7 @@ pub mod formats {
         #[ElementUsage::Texture(0)]
         uv: [f32; 2],
         #[ElementUsage::Normal]
-        normal: [i8; 3],
+        normal: Vector3<i8>,
         #[ElementUsage::Color]
         color: Color
     ));
@@ -188,7 +188,7 @@ pub mod formats {
         #[ElementUsage::Position]
         pos: Vector3<f32>,
         #[ElementUsage::Normal]
-        normal: [i8; 3]
+        normal: Vector3<i8>
     ));
     vertex!(PositionTexColor(
         #[ElementUsage::Position]
