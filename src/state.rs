@@ -1,3 +1,4 @@
+use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use enumflags2::{bitflags, BitFlags};
@@ -71,6 +72,23 @@ impl GraphicsContext {
             scissor: BooleanState,
             texture2d: BooleanState,
             _private: PhantomData,
+        }
+    }
+
+    #[inline(always)]
+    pub fn get_extensions(&self) -> Vec<&CStr> {
+        unsafe {
+            let mut length = 0;
+            gl::GetIntegerv(gl::NUM_EXTENSIONS, &mut length);
+            let mut extensions = Vec::with_capacity(length as usize);
+
+            for i in 0..length {
+                let ptr = gl::GetStringi(gl::EXTENSIONS, i as _);
+                let str = CStr::from_ptr(ptr.cast());
+                extensions.push(str);
+            }
+
+            extensions
         }
     }
 
