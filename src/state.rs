@@ -375,6 +375,13 @@ impl GraphicsContext {
             gl::Fogfv(gl::FOG_END, color.as_ptr());
         }
     }
+
+    #[inline(always)]
+    pub fn fog_distance_nv(&self, mode: nv::FogMode) {
+        unsafe {
+            gl::Fogi(nv::FOG_DISTANCE_MODE_NV, mode as _);
+        }
+    }
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -668,5 +675,18 @@ pub mod color {
         Specular = gl::SPECULAR,
         #[default]
         AmbientAndDiffuse = gl::AMBIENT_AND_DIFFUSE
+    }
+}
+
+pub mod nv {
+    use crate::raw::{GLenum, GLint};
+
+    pub const FOG_DISTANCE_MODE_NV: GLenum = 0x855A;
+    pub const FOG_EYE_RADIAL_NV: GLenum = 0x855B;
+    pub const FOG_EYE_PLANE_ABSOLUTE_NV: GLint = 0x855C;
+
+    #[repr(u32)]
+    pub enum FogMode {
+        EyeRadial = FOG_EYE_RADIAL_NV
     }
 }
