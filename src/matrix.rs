@@ -2,10 +2,16 @@ use cgmath::{Matrix, Matrix4};
 use super::gl;
 
 #[inline(always)]
-pub fn mul(matrix: &Matrix4<f32>, block: impl FnOnce()) {
+pub fn load(matrix: &Matrix4<f32>, mode: MatrixMode) {
     unsafe {
-        gl::MatrixMode(gl::MODELVIEW);
+        gl::MatrixMode(mode as _);
         gl::LoadMatrixf(matrix.as_ptr());
-        block();
     }
+}
+
+#[repr(u32)]
+pub enum MatrixMode {
+    Projection = gl::PROJECTION,
+    ModelView = gl::MODELVIEW,
+    Texture = gl::TEXTURE
 }
