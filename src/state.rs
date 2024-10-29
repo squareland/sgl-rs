@@ -1,6 +1,7 @@
 use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
+use cgmath::{Array, Vector3, Vector4};
 use enumflags2::{bitflags, BitFlags};
 use crate::gl;
 use crate::debug::GlError;
@@ -334,6 +335,13 @@ impl GraphicsContext {
     }
 
     #[inline(always)]
+    pub fn normal(&self, normal: Vector3<f32>) {
+        unsafe {
+            gl::Normal3fv(normal.as_ptr());
+        }
+    }
+
+    #[inline(always)]
     pub fn fog_mode(&self, mode: FogMode) {
         unsafe {
             gl::Fogi(gl::FOG_MODE, mode as _);
@@ -362,7 +370,7 @@ impl GraphicsContext {
     }
 
     #[inline(always)]
-    pub fn fog_color(&self, color: [f32; 4]) {
+    pub fn fog_color(&self, color: Vector4<f32>) {
         unsafe {
             gl::Fogfv(gl::FOG_END, color.as_ptr());
         }
