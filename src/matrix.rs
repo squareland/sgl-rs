@@ -5,10 +5,7 @@ use super::gl;
 pub fn mul(matrix: &Matrix4<f32>, block: impl FnOnce()) {
     unsafe {
         gl::MatrixMode(gl::MODELVIEW);
-        gl::PushMatrix();
-        gl::LoadIdentity();
-        gl::MultMatrixf(matrix.as_ptr());
+        gl::LoadMatrixf(matrix.as_ptr());
         block();
-        gl::PopMatrix();
     }
 }
