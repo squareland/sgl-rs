@@ -372,7 +372,7 @@ impl GraphicsContext {
     #[inline(always)]
     pub fn fog_color(&self, color: Vector4<f32>) {
         unsafe {
-            gl::Fogfv(gl::FOG_END, color.as_ptr());
+            gl::Fogfv(gl::FOG_COLOR, color.as_ptr());
         }
     }
 
