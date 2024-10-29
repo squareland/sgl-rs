@@ -382,6 +382,13 @@ impl GraphicsContext {
             gl::Fogi(nv::FOG_DISTANCE_MODE_NV, mode as _);
         }
     }
+
+    #[inline(always)]
+    pub fn fog_eye_plane_nv(&self, mode: nv::FogEyePlane) {
+        unsafe {
+            gl::Fogi(nv::FOG_DISTANCE_MODE_NV, mode as _);
+        }
+    }
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -679,14 +686,19 @@ pub mod color {
 }
 
 pub mod nv {
-    use crate::raw::{GLenum, GLint};
+    use crate::raw::GLenum;
 
     pub const FOG_DISTANCE_MODE_NV: GLenum = 0x855A;
     pub const FOG_EYE_RADIAL_NV: GLenum = 0x855B;
-    pub const FOG_EYE_PLANE_ABSOLUTE_NV: GLint = 0x855C;
+    pub const FOG_EYE_PLANE_ABSOLUTE_NV: GLenum = 0x855C;
 
     #[repr(u32)]
     pub enum FogMode {
         EyeRadial = FOG_EYE_RADIAL_NV
+    }
+
+    #[repr(u32)]
+    pub enum FogEyePlane {
+        Absolute = FOG_EYE_PLANE_ABSOLUTE_NV
     }
 }
