@@ -67,6 +67,7 @@ pub mod formats {
     use crate::shader::{LinkedProgramId};
     use cgmath::{Matrix4, Matrix, Vector3};
     use bytemuck::NoUninit;
+    use crate::matrix::MatrixMode;
 
     macro_rules! vertex {
         ($name:ident($(#[$usage:expr] $field:ident : $ty:ty),*)) => {
@@ -103,9 +104,7 @@ pub mod formats {
                         let _guard = source.bind();
                         unsafe {
                             Self::enable_client_state(source.start());
-                            gl::MatrixMode(gl::MODELVIEW);
-                            gl::LoadMatrixf(matrix.as_ptr());
-
+                            crate::matrix::load(matrix, MatrixMode::ModelView);
                             gl::UseProgram(program.map_or(0, |p| p.id()));
                             gl::DrawArrays(mode as _, 0, count as i32);
                             Self::disable_client_state();
