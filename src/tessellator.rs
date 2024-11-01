@@ -13,6 +13,7 @@ use super::gl;
 use super::gl::GLenum;
 
 #[derive(Copy, Clone, Debug)]
+#[repr(C)]
 pub struct Color(u8, u8, u8, u8);
 
 impl From<u32> for Color {

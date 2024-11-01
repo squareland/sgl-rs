@@ -7,6 +7,7 @@ pub use raw::*;
 
 use crate::gl;
 use crate::state::GraphicsContext;
+use crate::tessellator::Color;
 
 #[derive(Copy, Clone)]
 pub struct Mipmap {
@@ -176,7 +177,7 @@ pub fn download<P: AsRef<Path>>(texture: &TextureGuard, format: DownloadPixelFor
         gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         let width = texture.get_layer_width(layer);
         let height = texture.get_layer_height(layer);
-        let mut output = vec![0u32; (width * height) as usize];
+        let mut output = vec![Color::from(0); (width * height) as usize];
 
         texture.get_image(layer, format, width, height, &mut output);
 

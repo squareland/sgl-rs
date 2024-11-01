@@ -1,8 +1,9 @@
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use bytemuck::{AnyBitPattern, NoUninit};
+use bytemuck::{AnyBitPattern, NoUninit, Zeroable};
 use crate::gl;
 use crate::state::GraphicsContext;
+use crate::tessellator::Color;
 use super::buffer::DrawTarget;
 use super::GLenum;
 
@@ -407,10 +408,28 @@ unsafe impl Pixel for u8 {
     }
 }
 
+unsafe impl NoUninit for Color {}
+
+unsafe impl AnyBitPattern for Color {}
+
+unsafe impl Zeroable for Color {}
+
+unsafe impl Pixel for Color {
+    #[inline(always)]
+    fn gl_type() -> GLenum {
+        gl::UNSIGNED_INT_8_8_8_8_REV
+    }
+
+    #[inline(always)]
+    fn size() -> usize {
+        4
+    }
+}
+
 unsafe impl Pixel for u32 {
     #[inline(always)]
     fn gl_type() -> GLenum {
-        gl::UNSIGNED_INT_8_8_8_8_REV //FIXME: Maybe wrapper type?
+        gl::UNSIGNED_INT
     }
 
     #[inline(always)]

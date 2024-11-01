@@ -15,8 +15,10 @@ use crate::state::color::ColorMode;
 use crate::state::face::Face;
 use crate::state::fog::FogMode;
 use crate::state::light::LightModel;
+use crate::state::pixel::PixelFormat;
 use crate::state::shade::ShadeModel;
 use crate::state::stencil::{StencilOp, StencilFunc};
+use crate::texture::Pixel;
 use crate::texture::raw::TextureId;
 use super::raw::GLenum;
 
@@ -439,6 +441,15 @@ impl GraphicsContext {
             gl::Fogi(nv::FOG_DISTANCE_MODE_NV, mode as _);
         }
     }
+
+    pub fn read_pixels<P>(&self, x: u32, y: u32, width: u32, height: u32, format: PixelFormat, pixels: &mut [P]) where P: Pixel {
+        let bytes: &mut [u8] = bytemuck::cast_slice_mut(pixels);
+        let size = P::size() * (width * height) as usize;
+        assert_eq!(bytes.len(), size);
+        unsafe {
+            gl::ReadPixels(x as _, y as _, width as _, height as _, format as _, P::gl_type(), bytes.as_mut_ptr().cast())
+        }
+    }
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -464,6 +475,24 @@ impl<const E: GLenum> BooleanState<E> {
         unsafe {
             gl::Disable(E);
         }
+    }
+}
+
+pub mod pixel {
+    use crate::gl;
+
+    #[repr(u32)]
+    pub enum PixelFormat {
+        StencilIndex = gl::STENCIL_INDEX,
+        DepthComponent = gl::DEPTH_COMPONENT,
+        DepthStencil = gl::DEPTH_STENCIL,
+        Red = gl::RED,
+        Green = gl::GREEN,
+        Blue = gl::BLUE,
+        RGB = gl::RGB,
+        BGR = gl::BGR,
+        RGBA = gl::RGBA,
+        BGRA = gl::BGRA,
     }
 }
 
