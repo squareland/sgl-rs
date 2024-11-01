@@ -16,6 +16,7 @@ use crate::state::face::Face;
 use crate::state::fog::FogMode;
 use crate::state::light::LightModel;
 use crate::state::shade::ShadeModel;
+use crate::state::stencil::{StencilOp, StencilFunc};
 use crate::texture::raw::TextureId;
 use super::raw::GLenum;
 
@@ -148,6 +149,13 @@ impl GraphicsContext {
     }
 
     #[inline(always)]
+    pub fn clear_stencil(&self, i: u32) {
+        unsafe {
+            gl::ClearStencil(i as _)
+        }
+    }
+
+    #[inline(always)]
     pub fn clear_depth(&self, d: f32) {
         unsafe {
             gl::ClearDepth(d as _);
@@ -270,6 +278,48 @@ impl GraphicsContext {
     pub fn delete_buffers(&self, slots: &mut [u32]) {
         unsafe {
             gl::DeleteBuffers(slots.len() as _, slots.as_mut_ptr().cast());
+        }
+    }
+
+    #[inline(always)]
+    pub fn stencil_func(&self, func: StencilFunc, reference: i32, mask: u32) {
+        unsafe {
+            gl::StencilFunc(func as _, reference, mask);
+        }
+    }
+
+    #[inline(always)]
+    pub fn stencil_func_separate(&self, face: Face, func: StencilFunc, reference: i32, mask: u32) {
+        unsafe {
+            gl::StencilFuncSeparate(face as _, func as _, reference, mask);
+        }
+    }
+
+    #[inline(always)]
+    pub fn stencil_mask(&self, mask: u32) {
+        unsafe {
+            gl::StencilMask(mask);
+        }
+    }
+
+    #[inline(always)]
+    pub fn stencil_mask_separate(&self, face: Face, mask: u32) {
+        unsafe {
+            gl::StencilMaskSeparate(face as _, mask);
+        }
+    }
+
+    #[inline(always)]
+    pub fn stencil_op(&self, stencil_fail: StencilOp, depth_fail: StencilOp, depth_pass: StencilOp) {
+        unsafe {
+            gl::StencilOp(stencil_fail as _, depth_fail as _, depth_pass as _);
+        }
+    }
+
+    #[inline(always)]
+    pub fn stencil_op_separate(&self, face: Face, stencil_fail: StencilOp, depth_fail: StencilOp, depth_pass: StencilOp) {
+        unsafe {
+            gl::StencilOpSeparate(face as _, stencil_fail as _, depth_fail as _, depth_pass as _);
         }
     }
 
@@ -414,6 +464,36 @@ impl<const E: GLenum> BooleanState<E> {
         unsafe {
             gl::Disable(E);
         }
+    }
+}
+
+pub mod stencil {
+    use crate::gl;
+
+    #[repr(u32)]
+    pub enum StencilFunc {
+        Always = gl::ALWAYS,
+        Never = gl::NEVER,
+        Less = gl::LESS,
+        LessOrEqual = gl::LEQUAL,
+        Greater = gl::GREATER,
+        GreaterOrEqual = gl::GEQUAL,
+        Equal = gl::EQUAL,
+        NotEqual = gl::NOTEQUAL,
+    }
+
+    #[repr(u32)]
+    #[derive(Default)]
+    pub enum StencilOp {
+        #[default]
+        Keep = gl::KEEP,
+        Zero = gl::ZERO,
+        Replace = gl::REPLACE,
+        Invert = gl::INVERT,
+        Increment = gl::INCR,
+        WrappingIncrement = gl::INCR_WRAP,
+        Decrement = gl::DECR,
+        WrappingDecrement = gl::DECR_WRAP,
     }
 }
 
