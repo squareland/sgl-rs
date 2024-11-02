@@ -3,10 +3,11 @@ use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::ops::Deref;
 use std::ptr::null_mut;
-use cgmath::{Matrix, Matrix2, Matrix3, Matrix4, Vector2, Vector3, Vector4};
+use cgmath::{vec3, Matrix, Matrix2, Matrix3, Matrix4, Vector2, Vector3, Vector4};
 use crate::debug::GlError;
 use crate::gl;
 use crate::gl::GLint;
+use crate::shader::ProgramError;
 use crate::state::GraphicsContext;
 use crate::tessellator::Vertex;
 
@@ -428,6 +429,12 @@ impl ProgramId {
     }
 }
 
+pub trait Program {
+    type Format: Vertex;
+
+    fn from_source(context: GraphicsContext, vertex: &str, fragment: &str) -> Result<Self, ProgramError> where Self: Sized;
+}
+
 pub struct AttributeLocation<'a, A, V> {
     program: &'a LinkedProgramId<V>,
     location: GLint,
@@ -443,6 +450,10 @@ pub struct UniformLocation<'a, U, A> {
 impl<'a, U, V> UniformLocation<'a, U, V> where U: UniformValue {
     pub fn set(&self, value: U) {
         U::set(value, self.location);
+    }
+
+    pub unsafe fn into_inner(self) -> GLint {
+        self.location
     }
 }
 
