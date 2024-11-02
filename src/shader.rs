@@ -36,6 +36,7 @@ pub enum ProgramError {
     ProgramLinkage(String),
     ProgramValidation(GlError),
     UniformMissing(&'static str),
+    AttributeMissing(&'static str),
 }
 
 pub fn link_program<V: Vertex>(context: GraphicsContext, vert: &str, frag: &str) -> Result<LinkedProgramId<V>, ProgramError> {
@@ -51,6 +52,7 @@ pub fn link_program<V: Vertex>(context: GraphicsContext, vert: &str, frag: &str)
     program.attach(&vertex).map_err(ProgramError::ShaderAttach)?;
     program.attach(&fragment).map_err(ProgramError::ShaderAttach)?;
     let linked = program.link::<V>().map_err(ProgramError::ProgramLinkage)?;
+    V::bind_attributes(&linked)?;
     let info = linked.validate().map_err(ProgramError::ProgramValidation)?;
     eprintln!("{}", info);
     Ok(linked)

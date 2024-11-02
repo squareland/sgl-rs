@@ -2,7 +2,7 @@ use std::ffi::c_void;
 use bytemuck::NoUninit;
 use cgmath::{Matrix4, Vector1, Vector2, Vector3, Vector4};
 use crate::framebuffer::DrawTarget;
-use crate::shader::LinkedProgramId;
+use crate::shader::{LinkedProgramId, ProgramError};
 use crate::state::blend::Blend;
 use crate::state::draw::DrawMode;
 use crate::state::shade::ShadeModel;
@@ -114,14 +114,20 @@ pub mod formats {
                 }
 
                 #[inline(always)]
-                fn bind_attributes(program: &LinkedProgramId<Self>) {
+                fn bind_attributes(program: &LinkedProgramId<Self>) -> Result<(), $crate::shader::ProgramError> {
                     let mut id = 0;
                     $(
                         unsafe {
-                            gl::BindAttribLocation(program.0.get(), id, concat!(stringify!($field), "\0").as_ptr() as _);
+                            const CNAME: &[u8] = concat!(stringify!($field), "\u{0000}").as_bytes();
+                            let attribute = program.attribute::<$ty>(
+                                unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(CNAME) }
+                            ).ok_or($crate::shader::ProgramError::AttributeMissing(stringify!($field)))?;
+
+                            gl::BindAttribLocation(program.0.get(), id, CNAME.as_ptr() as _);
                             id += 1;
                         }
                     )*
+                    Ok(())
                 }
             }
 
@@ -207,7 +213,7 @@ pub trait Vertex: Sized + NoUninit {
 
     fn draw<S: VertexSource<Self>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>);
 
-    fn bind_attributes(program: &LinkedProgramId<Self>);
+    fn bind_attributes(program: &LinkedProgramId<Self>) -> Result<(), ProgramError>;
 }
 
 pub unsafe trait VertexSource<V: Vertex> {

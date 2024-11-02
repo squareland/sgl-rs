@@ -1,4 +1,4 @@
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::ops::Deref;
@@ -64,6 +64,22 @@ pub enum ShaderType {
     TessEvaluation = gl::TESS_EVALUATION_SHADER,
     Geometry       = gl::GEOMETRY_SHADER,
     Fragment       = gl::FRAGMENT_SHADER,
+}
+
+#[derive(Debug)]
+pub struct ActiveUniform<'a> {
+    pub id: u32,
+    pub name: &'a str,
+    pub size: u32,
+    pub ty: u32
+}
+
+#[derive(Debug)]
+pub struct ActiveAttribute<'a> {
+    pub id: u32,
+    pub name: &'a str,
+    pub size: u32,
+    pub ty: u32
 }
 
 impl GraphicsContext {
@@ -204,9 +220,8 @@ impl<V: Vertex> LinkedProgramId<V> {
         }
     }
 
-    pub fn attribute<A>(&self, name: &str) -> Option<AttributeLocation<A, V>> {
+    pub fn attribute<A>(&self, name: &CStr) -> Option<AttributeLocation<A, V>> {
         unsafe {
-            let name = CString::new(name).unwrap();
             let location = gl::GetAttribLocation(self.id(), name.as_ptr());
             if location == -1 {
                 return None;
@@ -228,6 +243,108 @@ impl<V: Vertex> LinkedProgramId<V> {
             } else {
                 Err(GlError::get())
             }
+        }
+    }
+
+    pub fn get_active_uniforms<'b, 'p>(&'p self, buffer: &'b mut [u8]) -> ActiveUniforms<'b, 'p, V> {
+        let count = self.get(ProgramParam::ActiveUniforms) as u32;
+        ActiveUniforms {
+            program: self,
+            buffer,
+            index: 0,
+            count,
+        }
+    }
+
+    pub fn get_active_attributes<'b, 'p>(&'p self, buffer: &'b mut [u8]) -> ActiveAttributes<'b, 'p, V> {
+        let count = self.get(ProgramParam::ActiveAttributes) as u32;
+        ActiveAttributes {
+            program: self,
+            buffer,
+            index: 0,
+            count,
+        }
+    }
+}
+
+pub trait LendingIterator {
+    type Item<'a>
+    where
+        Self: 'a;
+
+    fn next(&mut self) -> Option<Self::Item<'_>>;
+}
+
+pub struct ActiveAttributes<'buffer, 'program, V> {
+    program: &'program LinkedProgramId<V>,
+    buffer: &'buffer mut [u8],
+    index: u32,
+    count: u32
+}
+
+impl<'buffer, 'program, V> LendingIterator for ActiveAttributes<'buffer, 'program, V> {
+    type Item<'a> = Result<ActiveAttribute<'a>, GlError> where Self: 'a;
+
+    fn next(&mut self) -> Option<Self::Item<'_>> {
+        if self.index < self.count {
+            let max_len = self.buffer.len() - 1;
+            let result = unsafe {
+                let mut len = 0;
+                let mut size = 0;
+                let mut ty = 0;
+                gl::GetActiveAttrib(self.program.id(), self.index as _, max_len as _, &mut len, &mut size, &mut ty, self.buffer.as_mut_ptr().cast());
+                if len != 0 {
+                    Ok(ActiveAttribute {
+                        id: self.index,
+                        name: std::str::from_utf8_unchecked(&self.buffer[0..len as usize]),
+                        size: size as _,
+                        ty: ty as _,
+                    })
+                } else {
+                    Err(GlError::get())
+                }
+            };
+            self.index += 1;
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
+pub struct ActiveUniforms<'buffer, 'program, V> {
+    program: &'program LinkedProgramId<V>,
+    buffer: &'buffer mut [u8],
+    index: u32,
+    count: u32
+}
+
+impl<'buffer, 'program, V> LendingIterator for ActiveUniforms<'buffer, 'program, V> {
+    type Item<'a> = Result<ActiveUniform<'a>, GlError> where Self: 'a;
+
+    fn next(&mut self) -> Option<Self::Item<'_>> {
+        if self.index < self.count {
+            let max_len = self.buffer.len() - 1;
+            let result = unsafe {
+                let mut len = 0;
+                let mut size = 0;
+                let mut ty = 0;
+                gl::GetActiveUniform(self.program.id(), self.index as _, max_len as _, &mut len, &mut size, &mut ty, self.buffer.as_mut_ptr().cast());
+                if len != 0 {
+                    Ok(ActiveUniform {
+                        id: self.index,
+                        name: std::str::from_utf8_unchecked(&self.buffer[0..len as usize]),
+                        size: size as _,
+                        ty: ty as _,
+                    })
+                } else {
+                    Err(GlError::get())
+                }
+            };
+            self.index += 1;
+            Some(result)
+        } else {
+            None
         }
     }
 }
@@ -258,7 +375,6 @@ impl ProgramId {
             let status = self.get(ProgramParam::LinkStatus);
             if status == gl::TRUE as _ {
                 let linked = LinkedProgramId(self, PhantomData);
-                V::bind_attributes(&linked);
                 Ok(linked)
             } else {
                 Err(self.get_info_log())
