@@ -106,7 +106,7 @@ pub fn enable<C>(callback: C) where C: FnMut(DebugSource, DebugSeverity, DebugTy
                                       callback: *mut c_void) {
 
         unsafe {
-            let mut callback = callback.cast::<Box<DebugCallback>>();
+            let callback = callback.cast::<Box<DebugCallback>>();
             if let Some(callback) = callback.as_mut() {
                 let source = DebugSource::from(source);
                 let ty = DebugType::from(gltype);

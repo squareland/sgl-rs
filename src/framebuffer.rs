@@ -1,18 +1,14 @@
+use crate::gl;
+use crate::state::{BufferBit, GraphicsContext};
+use crate::texture::raw::{Texture, TextureGuard, TextureId};
+use enumflags2::BitFlags;
 use std::ops::{Add, Deref, Mul, Sub};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use cgmath::{Matrix4, Vector3};
-use enumflags2::BitFlags;
-use crate::gl;
-use crate::texture::raw::{Texture, TextureGuard, TextureId};
-use crate::state::{BufferBit, GraphicsContext};
-use crate::state::draw::DrawMode;
-use crate::tessellator::formats::PositionTex;
 
 pub use crate::raw::buffer as raw;
+use crate::texture::{InternalTextureFormat, MagFilter, MinFilter, TextureWrap, UploadPixelFormat};
 pub use raw::*;
-use crate::shader::LinkedProgramId;
-use crate::texture::{InternalTextureFormat, MagFilter, MinFilter, UploadPixelFormat, TextureWrap};
 
 pub struct Framebuffer {
     id: FramebufferId,
@@ -77,16 +73,12 @@ impl Framebuffer {
         }
     }
 
-    pub fn render<T: DrawTarget>(&self, w: u32, h: u32, disable_blend: bool, target: &mut T, matrix: Matrix4<f32>, program: Option<&LinkedProgramId<PositionTex>>) {
+    pub fn render<F>(&self, w: u32, h: u32, disable_blend: bool, callback: F) where F: FnOnce([([f32; 3], [f32; 2]); 4], &TextureGuard) {
         let c = &self.context;
 
         c.color_mask(true, true, true, false);
         c.depth.disable();
         c.depth_mask(false);
-
-        let m = matrix
-            * cgmath::ortho(0.0, w as f32, h as f32, 0.0, 1000.0, 3000.0)
-            * Matrix4::from_translation(-2000.0f32 * Vector3::unit_z());
 
         c.viewport(0, 0, w, h);
         c.texture2d.enable();
@@ -105,12 +97,12 @@ impl Framebuffer {
         let tw = self.width as f32 / self.texture_width as f32;
         let th = self.height as f32 / self.texture_height as f32;
 
-        super::tessellator::draw_textured(DrawMode::Quads, &[
-            PositionTex::new([x, y + h, 0.0], [0.0, 0.0]),
-            PositionTex::new([x + w, y + h, 0.0], [tw, 0.0]),
-            PositionTex::new([x + w, y, 0.0], [tw, th]),
-            PositionTex::new([x, y, 0.0], [0.0, th]),
-        ], target, &self.texture.bind(), &m, program);
+        callback([
+            ([x, y + h, 0.0], [0.0, 0.0]),
+            ([x + w, y + h, 0.0], [tw, 0.0]),
+            ([x + w, y, 0.0], [tw, th]),
+            ([x, y, 0.0], [0.0, th]),
+        ], &self.texture.bind());
 
         c.depth_mask(true);
         c.color_mask(true, true, true, true);

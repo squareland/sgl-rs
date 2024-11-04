@@ -1,13 +1,10 @@
-use std::ffi::c_void;
-use bytemuck::NoUninit;
-use cgmath::{Matrix4, Vector1, Vector2, Vector3, Vector4};
 use crate::framebuffer::DrawTarget;
 use crate::shader::{LinkedProgramId, ProgramError};
-use crate::state::blend::Blend;
 use crate::state::draw::DrawMode;
-use crate::state::shade::ShadeModel;
 use crate::texture::TextureGuard;
-use self::formats::{PositionColor, PositionTex};
+use bytemuck::NoUninit;
+use cgmath::{Matrix4, Vector1, Vector2, Vector3, Vector4};
+use std::ffi::c_void;
 
 use super::gl;
 use super::gl::{GLenum, GLint};
@@ -58,12 +55,12 @@ impl Element for Color {
 }
 
 pub mod formats {
-    use super::{Color, ElementUsage, Vertex};
-    use crate::{gl, matrix};
-    use crate::state::draw::DrawMode;
-    use crate::shader::{LinkedProgramId};
-    use cgmath::{Matrix4, Matrix, Vector3};
+    use super::Vertex;
     use crate::matrix::MatrixMode;
+    use crate::shader::LinkedProgramId;
+    use crate::state::draw::DrawMode;
+    use crate::{gl, matrix};
+    use cgmath::{Matrix, Matrix4};
 
     pub unsafe fn draw<V: Vertex>(mode: DrawMode, count: usize, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
         matrix::load(matrix, MatrixMode::ModelView);
@@ -84,108 +81,6 @@ pub mod formats {
 
         fn bind(&self) -> () {}
     }
-
-    #[macro_export]
-    macro_rules! vertex {
-        ($name:ident($(#[$usage:expr] $field:ident : $ty:ty),*)) => {
-            #[repr(C)]
-            #[derive(Copy, Clone, Debug)]
-            pub struct $name {
-                $(pub $field: $ty),+
-            }
-
-            unsafe impl bytemuck::NoUninit for $name {}
-
-            impl $crate::tessellator::Vertex for $name {
-                unsafe fn enable_client_state(start: *const $name) {
-                    let size = std::mem::size_of::<Self>();
-                    $(
-                        let offset = field_offset::offset_of!(Self => $field);
-                        $usage.begin::<$ty>(size as i32, offset.apply_ptr(start).cast());
-                    )*
-                }
-
-                unsafe fn disable_client_state() {
-                    $(
-                        $usage.end();
-                    )*
-                }
-
-                #[inline(always)]
-                fn bind_attributes(program: &LinkedProgramId<Self>) -> Result<(), $crate::shader::ProgramError> {
-                    let mut id = 0;
-                    $(
-                        unsafe {
-                            const CNAME: &[u8] = concat!(stringify!($field), "\u{0000}").as_bytes();
-                            let name = unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(CNAME) };
-                            let attribute = program.attribute::<$ty>(name)
-                                .ok_or($crate::shader::ProgramError::AttributeMissing(stringify!($field)))?;
-                            attribute.bind(id);
-                            id += 1;
-                        }
-                    )*
-                    Ok(())
-                }
-            }
-
-            impl $name {
-                pub fn new($($field: impl Into<$ty>),*) -> Self {
-                    Self {
-                        $($field: $field.into()),*
-                    }
-                }
-            }
-        };
-    }
-
-    vertex!(Position(
-        #[ElementUsage::Position]
-        pos: Vector3<f32>
-    ));
-    vertex!(PositionColor(
-        #[ElementUsage::Position]
-        pos: Vector3<f32>,
-        #[ElementUsage::Color]
-        color: Color
-    ));
-    vertex!(PositionTex(
-        #[ElementUsage::Position]
-        pos: Vector3<f32>,
-        #[ElementUsage::Texture(0)]
-        uv: [f32; 2]
-    ));
-    vertex!(PositionTexNormal(
-        #[ElementUsage::Position]
-        pos: Vector3<f32>,
-        #[ElementUsage::Texture(0)]
-        uv: [f32; 2],
-        #[ElementUsage::Normal]
-        normal: Vector3<i8>
-    ));
-    vertex!(PositionTexNormalColor(
-        #[ElementUsage::Position]
-        pos: Vector3<f32>,
-        #[ElementUsage::Texture(0)]
-        uv: [f32; 2],
-        #[ElementUsage::Normal]
-        normal: Vector3<i8>,
-        #[ElementUsage::Color]
-        color: Color
-    ));
-    vertex!(PositionNormal(
-        #[ElementUsage::Position]
-        pos: Vector3<f32>,
-        #[ElementUsage::Normal]
-        normal: Vector3<i8>
-    ));
-    vertex!(PositionTexColor(
-        #[ElementUsage::Position]
-        pos: Vector3<f32>,
-        #[ElementUsage::Texture(0)]
-        uv: [f32; 2],
-        #[ElementUsage::Color]
-        color: Color
-    ));
 }
 
 pub trait Vertex: Sized + NoUninit {
@@ -387,38 +282,6 @@ pub fn draw_textured<'a, V: Vertex, S: VertexSource<V>, D: DrawTarget>(mode: Dra
 
     texture.context().texture2d.enable();
     V::draw(vertices, mode, matrix, program)
-}
-
-#[inline]
-pub fn draw_gradient_rect<D: DrawTarget>(left: f32, top: f32, right: f32, bottom: f32, from: impl Into<Color> + Copy, to: impl Into<Color> + Copy, target: &mut D, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<PositionColor>>) {
-    let c = target.context();
-    c.texture2d.disable();
-    c.alpha.disable();
-    c.blend(Blend::default());
-    c.shade_model(ShadeModel::Smooth);
-    draw(DrawMode::Quads, &[
-        PositionColor::new([right, top, 0.0], from),
-        PositionColor::new([left, top, 0.0], from),
-        PositionColor::new([left, bottom, 0.0], to),
-        PositionColor::new([right, bottom, 0.0], to),
-    ], target, matrix, program);
-    let c = target.context();
-    c.shade_model(ShadeModel::Flat);
-    c.blend.disable();
-    c.alpha.enable();
-    c.texture2d.enable();
-}
-
-#[inline]
-pub fn draw_textured_rect<'a, D: DrawTarget>(x: f32, y: f32, w: f32, h: f32, tx: f32, ty: f32, target: &mut D, texture: &TextureGuard<'a>, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<PositionTex>>) {
-    let scale_x = 1.0 / 256.0;
-    let scale_y = 1.0 / 256.0;
-    draw_textured(DrawMode::Quads, &[
-        PositionTex::new([x, y + h, 0.0], [tx * scale_x, (ty + h) * scale_y]),
-        PositionTex::new([x + w, y + h, 0.0], [(tx + w) * scale_x, (ty + h) * scale_y]),
-        PositionTex::new([x + w, y, 0.0], [(tx + w) * scale_x, ty * scale_y]),
-        PositionTex::new([x, y, 0.0], [tx * scale_x, ty * scale_y]),
-    ], target, texture, matrix, program);
 }
 
 pub fn rgb(r: f32, g: f32, b: f32) -> [u8; 4] {
