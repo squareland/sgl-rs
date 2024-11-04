@@ -437,6 +437,28 @@ unsafe impl Pixel for u32 {
     }
 }
 
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct Stencil(pub u32);
+
+unsafe impl NoUninit for Stencil {}
+
+unsafe impl AnyBitPattern for Stencil {}
+
+unsafe impl Zeroable for Stencil {}
+
+unsafe impl Pixel for Stencil {
+    #[inline(always)]
+    fn gl_type() -> GLenum {
+        gl::UNSIGNED_INT
+    }
+
+    #[inline(always)]
+    fn size() -> usize {
+        4
+    }
+}
+
 impl<'texture> Drop for TextureGuard<'texture> {
     #[inline(always)]
     fn drop(&mut self) {
@@ -586,6 +608,13 @@ impl GraphicsContext {
     pub fn set_tex_env_scale_alpha(&self, scale: Scale) {
         unsafe {
             gl::TexEnvf(gl::TEXTURE_ENV, gl::ALPHA_SCALE, scale as u32 as f32);
+        }
+    }
+    
+    pub fn set_active_texture(&self, texture: u8) {
+        assert!(texture < 32);
+        unsafe {
+            gl::ActiveTexture(gl::TEXTURE0 + texture as GLenum);
         }
     }
 }
