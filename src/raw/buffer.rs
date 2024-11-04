@@ -1,8 +1,13 @@
-use std::marker::ConstParamTy;
+use std::ffi::c_void;
+use std::marker::{ConstParamTy, PhantomData};
+use std::mem::ManuallyDrop;
 use std::num::NonZeroU32;
+use std::ops::{Deref, DerefMut};
 use crate::gl;
 use crate::debug::gl_enum;
 use crate::state::GraphicsContext;
+use crate::state::pixel::PixelFormat;
+use crate::texture::Pixel;
 use super::texture::TextureGuard;
 use super::GLenum;
 
@@ -144,6 +149,13 @@ impl<'buffer> FramebufferGuard<'buffer> {
 
 impl<'buffer, const K: BufferKind> BufferGuard<'buffer, K> {
     #[inline(always)]
+    pub fn allocate(&self, bytes: usize, mode: UploadMode) {
+        unsafe {
+            gl::BufferData(K as _, bytes as _, std::ptr::null(), mode as _);
+        }
+    }
+    
+    #[inline(always)]
     pub fn upload(&self, data: &[u8], mode: UploadMode) {
         unsafe {
             gl::BufferData(K as _, data.len() as _, data.as_ptr().cast(), mode as _);
@@ -154,6 +166,74 @@ impl<'buffer, const K: BufferKind> BufferGuard<'buffer, K> {
     pub fn sub_upload(&self, offset: usize, data: &[u8]) {
         unsafe {
             gl::BufferSubData(K as _, offset as _, data.len() as _, data.as_ptr().cast());
+        }
+    }
+
+    #[inline(always)]
+    pub unsafe fn mapped<V>(self, size: usize, access: BufferAccess) -> MappedBuffer<'buffer, K, V> {
+        let ptr = unsafe {
+            gl::MapBuffer(K as _, access as _)
+        };
+        assert_eq!(ptr.align_offset(align_of::<V>()), 0, "unaligned mapped buffer");
+        assert!(!ptr.is_null(), "ptr is null");
+        MappedBuffer {
+            buffer: self,
+            ptr,
+            size,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'buffer> BufferGuard<'buffer, { BufferKind::PixelPack }> {
+    pub unsafe fn read_pixels<P>(&self, x: u32, y: u32, width: u32, height: u32, format: PixelFormat) where P: Pixel {
+        unsafe {
+            gl::ReadPixels(x as _, y as _, width as _, height as _, format as _, P::gl_type() as _, std::ptr::null_mut());
+        }    
+    }
+}
+
+pub struct MappedBuffer<'buffer, const K: BufferKind, V> {
+    buffer: BufferGuard<'buffer, K>,
+    ptr: *mut c_void,
+    size: usize,
+    _phantom: PhantomData<*mut V>,
+}
+
+impl<'buffer, const K: BufferKind, V> MappedBuffer<'buffer, K, V> {
+    pub fn unmap(self) -> BufferGuard<'buffer, K> {
+        let this = ManuallyDrop::new(self);
+        unsafe {
+            gl::UnmapBuffer(K as _);
+        }
+        BufferGuard {
+            buffer: this.buffer.buffer
+        }
+    }
+}
+
+impl<'buffer, const K: BufferKind, V> Drop for MappedBuffer<'buffer, K, V> {
+    fn drop(&mut self) {
+        unsafe {
+            gl::UnmapBuffer(K as _);
+        }
+    }
+}
+
+impl<'buffer, const K: BufferKind, V> Deref for MappedBuffer<'buffer, K, V> {
+    type Target = [V];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe {
+            std::slice::from_raw_parts(self.ptr.cast(), self.size)
+        }
+    }
+}
+
+impl<'buffer, const K: BufferKind, V> DerefMut for MappedBuffer<'buffer, K, V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe {
+            std::slice::from_raw_parts_mut(self.ptr.cast(), self.size)
         }
     }
 }
@@ -169,6 +249,13 @@ pub enum UploadMode {
     DynamicDraw = gl::DYNAMIC_DRAW,
     DynamicRead = gl::DYNAMIC_READ,
     DynamicCopy = gl::DYNAMIC_COPY,
+}
+
+#[repr(u32)]
+pub enum BufferAccess {
+    ReadOnly = gl::READ_ONLY,
+    WriteOnly = gl::WRITE_ONLY,
+    ReadWrite = gl::READ_WRITE,
 }
 
 impl<'buffer> RenderbufferGuard<'buffer> {
