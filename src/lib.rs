@@ -6,6 +6,8 @@
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
+pub use bytemuck::NoUninit;
+pub use field_offset::offset_of;
 
 
 pub use cgmath as math;
