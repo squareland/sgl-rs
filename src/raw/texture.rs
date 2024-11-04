@@ -3,6 +3,8 @@ use std::rc::Rc;
 use bytemuck::{AnyBitPattern, NoUninit, Zeroable};
 use cgmath::{Array, Vector4};
 use crate::gl;
+use crate::gl::GLint;
+use crate::shader::UniformValue;
 use crate::state::GraphicsContext;
 use crate::tessellator::Color;
 use super::buffer::DrawTarget;
@@ -29,7 +31,8 @@ impl Drop for TextureId {
 }
 
 pub struct TextureGuard<'texture> {
-    texture: &'texture TextureId
+    texture: &'texture TextureId,
+    unit: GLint
 }
 
 impl<'texture> TextureGuard<'texture> {
@@ -75,7 +78,11 @@ impl<'texture> TextureGuard<'texture> {
         }
         h as _
     }
-
+    
+    pub fn as_sampler(&self) -> Sampler2d {
+        Sampler2d(self.unit)
+    }
+ 
     #[inline(always)]
     pub fn wrap_s(&self, wrap: TextureWrap) {
         unsafe {
@@ -468,6 +475,16 @@ impl<'texture> Drop for TextureGuard<'texture> {
     }
 }
 
+pub struct Sampler2d(GLint);
+
+impl UniformValue for Sampler2d {
+    fn set(self, location: GLint) {
+        unsafe {
+            gl::Uniform1i(location, self.0);
+        }
+    }
+}
+
 pub trait Texture<'a> {
     fn bind(self) -> Rc<TextureGuard<'a>>;
 }
@@ -475,11 +492,14 @@ pub trait Texture<'a> {
 impl<'a> Texture<'a> for &'a TextureId {
     #[inline(always)]
     fn bind(self) -> Rc<TextureGuard<'a>> {
+        let mut unit = 0;
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.0.get());
-        }
+            gl::GetIntegerv(gl::ACTIVE_TEXTURE, &mut unit);
+        };
         Rc::new(TextureGuard {
-            texture: self
+            texture: self,
+            unit
         })
     }
 }
@@ -487,11 +507,14 @@ impl<'a> Texture<'a> for &'a TextureId {
 impl<'a> Texture<'a> for &'a mut TextureId {
     #[inline(always)]
     fn bind(self) -> Rc<TextureGuard<'a>> {
+        let mut unit = 0;
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.0.get());
+            gl::GetIntegerv(gl::ACTIVE_TEXTURE, &mut unit);
         }
         Rc::new(TextureGuard {
-            texture: self
+            texture: self,
+            unit
         })
     }
 }
