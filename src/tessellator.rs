@@ -58,12 +58,19 @@ impl Element for Color {
 }
 
 pub mod formats {
-    use super::Color;
+    use super::{Color, Vertex};
     use super::ElementUsage;
-    use crate::gl;
+    use crate::{gl, matrix};
     use crate::state::draw::DrawMode;
     use crate::shader::{LinkedProgramId};
     use cgmath::{Matrix4, Matrix, Vector3};
+    use crate::matrix::MatrixMode;
+
+    pub unsafe fn draw<V: Vertex>(mode: DrawMode, count: usize, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
+        matrix::load(matrix, MatrixMode::ModelView);
+        gl::UseProgram(program.map_or(0, |p| p.id()));
+        gl::DrawArrays(mode as _, 0, count as i32);
+    }
 
     #[macro_export]
     macro_rules! vertex {
@@ -101,9 +108,7 @@ pub mod formats {
                         let _guard = source.bind();
                         unsafe {
                             Self::enable_client_state(source.start());
-                            crate::matrix::load(matrix, $crate::matrix::MatrixMode::ModelView);
-                            gl::UseProgram(program.map_or(0, |p| p.id()));
-                            gl::DrawArrays(mode as _, 0, count as i32);
+                            $crate::tessellator::formats::draw(mode, count, matrix, program);
                             Self::disable_client_state();
                         }
                     }

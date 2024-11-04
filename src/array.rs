@@ -1,13 +1,12 @@
-use std::marker::PhantomData;
-use cgmath::{Matrix, Matrix4};
 use crate::framebuffer::{BufferId, BufferKind, UploadMode};
-use crate::gl;
 use crate::raw::array::VertexArrayId;
 use crate::shader::LinkedProgramId;
 use crate::state::draw::DrawMode;
 use crate::state::GraphicsContext;
 use crate::tessellator::Vertex;
 use crate::texture::TextureGuard;
+use cgmath::Matrix4;
+use std::marker::PhantomData;
 
 pub struct VertexArray<V> {
     id: VertexArrayId,
@@ -60,11 +59,7 @@ impl<V: Vertex> VertexArray<V> {
         let count = self.vertices;
         if count > 0 {
             unsafe {
-                gl::MatrixMode(gl::MODELVIEW);
-                gl::LoadMatrixf(matrix.as_ptr());
-
-                gl::UseProgram(program.map_or(0, |p| p.id()));
-                gl::DrawArrays(mode as _, 0, count as i32);
+                crate::tessellator::formats::draw(mode, count, matrix, program);
             }
         }
     }
