@@ -148,16 +148,26 @@ impl<'texture> TextureGuard<'texture> {
 
     #[inline(always)]
     pub fn set_sub_image<P>(&self, level: u32, x: u32, y: u32, width: u32, height: u32, format: UploadPixelFormat, pixels: Option<&[P]>) where P: Pixel {
+        let bytes: Option<&[u8]> = pixels.map(bytemuck::cast_slice);
+        if let Some(bytes) = bytes {
+            let size = P::size() * (width * height) as usize;
+            assert_eq!(bytes.len(), size);
+        }
         unsafe {
-            let ptr = pixels.map_or_else(std::ptr::null_mut, |v| v.as_ptr() as _);
+            let ptr = bytes.map_or_else(std::ptr::null, |v| v.as_ptr() as _);
             gl::TexSubImage2D(gl::TEXTURE_2D, level as _, x as _, y as _, width as _, height as _, format as _, P::gl_type(), ptr);
         }
     }
 
     #[inline(always)]
     pub fn set_image<P>(&self, level: u32, internal_format: InternalTextureFormat, width: u32, height: u32, format: UploadPixelFormat, pixels: Option<&[P]>) where P: Pixel {
+        let bytes: Option<&[u8]> = pixels.map(bytemuck::cast_slice);
+        if let Some(bytes) = bytes {
+            let size = P::size() * (width * height) as usize;
+            assert_eq!(bytes.len(), size);
+        }
         unsafe {
-            let ptr = pixels.map_or_else(std::ptr::null_mut, |v| v.as_ptr() as _);
+            let ptr = bytes.map_or_else(std::ptr::null, |v| v.as_ptr() as _);
             gl::TexImage2D(gl::TEXTURE_2D, level as _, internal_format as _, width as _ , height as _, 0, format as _, P::gl_type(), ptr);
         }
     }
