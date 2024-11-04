@@ -5,6 +5,7 @@ use std::num::NonZeroU32;
 use std::ops::{Deref, DerefMut};
 use crate::gl;
 use crate::debug::gl_enum;
+use crate::raw::fence::{Sync, SyncCondition};
 use crate::state::GraphicsContext;
 use crate::state::pixel::PixelFormat;
 use crate::texture::Pixel;
@@ -186,10 +187,11 @@ impl<'buffer, const K: BufferKind> BufferGuard<'buffer, K> {
 }
 
 impl<'buffer> BufferGuard<'buffer, { BufferKind::PixelPack }> {
-    pub unsafe fn read_pixels<P>(&self, x: u32, y: u32, width: u32, height: u32, format: PixelFormat) where P: Pixel {
+    pub unsafe fn read_pixels<P>(&self, x: u32, y: u32, width: u32, height: u32, format: PixelFormat) -> Sync where P: Pixel {
         unsafe {
             gl::ReadPixels(x as _, y as _, width as _, height as _, format as _, P::gl_type() as _, std::ptr::null_mut());
-        }    
+        }
+        self.buffer.1.fence(SyncCondition::GpuCommandsComplete)
     }
 }
 

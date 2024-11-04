@@ -1,14 +1,13 @@
-use std::marker::PhantomData;
-use cgmath::Matrix4;
 use crate::framebuffer::{BufferAccess, BufferGuard, BufferId, BufferKind, MappedBuffer, UploadMode};
-use crate::gl;
-use crate::raw::fence::{Sync, SyncCondition};
+use crate::raw::fence::Sync;
 use crate::shader::LinkedProgramId;
 use crate::state::draw::DrawMode;
-use crate::state::GraphicsContext;
 use crate::state::pixel::PixelFormat;
+use crate::state::GraphicsContext;
 use crate::tessellator::{Vertex, VertexSource};
 use crate::texture::{Pixel, TextureGuard};
+use cgmath::Matrix4;
+use std::marker::PhantomData;
 
 pub struct VertexBuffer<V> {
     id: BufferId<{ BufferKind::Array }>,
@@ -95,14 +94,18 @@ impl<P> PixelPackBuffer<P> {
 }
 
 impl<P> PixelPackBuffer<P> where P: Pixel {
-    pub fn download(&self, x: u32, y: u32, width: u32, height: u32, format: PixelFormat, pixels: &mut [P]) -> Sync {
-        let bytes: &mut [u8] = bytemuck::cast_slice_mut(pixels);
-        let size = P::size() * (width * height) as usize;
-        assert_eq!(bytes.len(), size);
+    #[inline(always)]
+    pub fn allocate(&mut self, pixels: usize, mode: UploadMode) {
+        self.size = P::size() * pixels;
+        self.id.bind().allocate(self.size, mode);
+    }
+    
+    #[inline(always)]
+    pub fn download(&self, x: u32, y: u32, width: u32, height: u32, format: PixelFormat) -> Sync {
+        assert!(self.size > 0, "cannot download to unallocated buffer");
         unsafe {
-            gl::ReadPixels(x as _, y as _, width as _, height as _, format as _, P::gl_type(), bytes.as_mut_ptr().cast())
+            self.id.bind().read_pixels::<P>(x, y, width, height, format)
         }
-        self.context.fence(SyncCondition::GpuCommandsComplete)
     }
 }
 
