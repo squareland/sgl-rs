@@ -10,7 +10,7 @@ use crate::texture::TextureGuard;
 use self::formats::{PositionColor, PositionTex};
 
 use super::gl;
-use super::gl::GLenum;
+use super::gl::{GLenum, GLint};
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
@@ -58,8 +58,7 @@ impl Element for Color {
 }
 
 pub mod formats {
-    use super::{Color, Vertex};
-    use super::ElementUsage;
+    use super::{Color, ElementUsage, Vertex};
     use crate::{gl, matrix};
     use crate::state::draw::DrawMode;
     use crate::shader::{LinkedProgramId};
@@ -70,6 +69,20 @@ pub mod formats {
         matrix::load(matrix, MatrixMode::ModelView);
         gl::UseProgram(program.map_or(0, |p| p.id()));
         gl::DrawArrays(mode as _, 0, count as i32);
+    }
+
+    unsafe impl<R, V> super::VertexSource<V> for R where R: AsRef<[V]>, V: Vertex {
+        type Guard<'a> = () where Self: 'a;
+
+        fn start(&self) -> *const V {
+            self.as_ref().as_ptr().cast()
+        }
+
+        fn count(&self) -> usize {
+            self.as_ref().len()
+        }
+
+        fn bind(&self) -> () {}
     }
 
     #[macro_export]
@@ -88,10 +101,7 @@ pub mod formats {
                     let size = std::mem::size_of::<Self>();
                     $(
                         let offset = field_offset::offset_of!(Self => $field);
-                        let len = <$ty as $crate::tessellator::Element>::len();
-                        let gl = <$ty as $crate::tessellator::Element>::gl();
-                        let usage = $usage;
-                        usage.begin(len as _, gl, size as i32, offset.apply_ptr(start).cast());
+                        $usage.begin::<$ty>(size as i32, offset.apply_ptr(start).cast());
                     )*
                 }
 
@@ -99,19 +109,6 @@ pub mod formats {
                     $(
                         $usage.end();
                     )*
-                }
-
-                #[inline(always)]
-                fn draw<S: $crate::tessellator::VertexSource<$name>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>) {
-                    let count = source.count();
-                    if count > 0 {
-                        let _guard = source.bind();
-                        unsafe {
-                            Self::enable_client_state(source.start());
-                            $crate::tessellator::formats::draw(mode, count, matrix, program);
-                            Self::disable_client_state();
-                        }
-                    }
                 }
 
                 #[inline(always)]
@@ -136,21 +133,6 @@ pub mod formats {
                     Self {
                         $($field: $field.into()),*
                     }
-                }
-            }
-
-            unsafe impl<R> $crate::tessellator::VertexSource<$name> for R where R: AsRef<[$name]> {
-                type Guard<'a> = () where Self: 'a;
-
-                fn start(&self) -> *const $name {
-                    self.as_ref().as_ptr().cast()
-                }
-
-                fn count(&self) -> usize {
-                    self.as_ref().len()
-                }
-
-                fn bind(&self) -> () {
                 }
             }
         };
@@ -211,7 +193,18 @@ pub trait Vertex: Sized + NoUninit {
 
     unsafe fn disable_client_state();
 
-    fn draw<S: VertexSource<Self>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>);
+    #[inline(always)]
+    fn draw<S: VertexSource<Self>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>) {
+        let count = source.count();
+        if count > 0 {
+            let _guard = source.bind();
+            unsafe {
+                Self::enable_client_state(source.start());
+                formats::draw(mode, count, matrix, program);
+                Self::disable_client_state();
+            }
+        }
+    }
 
     fn bind_attributes(program: &LinkedProgramId<Self>) -> Result<(), ProgramError>;
 }
@@ -225,10 +218,10 @@ pub unsafe trait VertexSource<V: Vertex> {
     fn bind(&self) -> Self::Guard<'_>;
 }
 
-trait Element: Sized {
+pub trait Element: Sized {
     #[inline(always)]
     fn size() -> usize {
-        std::mem::size_of::<Self>()
+        size_of::<Self>()
     }
 
     fn len() -> usize {
@@ -329,56 +322,54 @@ pub enum ElementUsage {
 
 impl ElementUsage {
     #[inline(always)]
-    fn begin(&self, count: i32, ty: GLenum, stride: i32, ptr: *const c_void) {
-        unsafe {
-            match self {
-                ElementUsage::Position => {
-                    gl::VertexPointer(count, ty, stride, ptr);
-                    gl::EnableClientState(gl::VERTEX_ARRAY);
-                }
-                ElementUsage::Normal => {
-                    gl::NormalPointer(ty, stride, ptr);
-                    gl::EnableClientState(gl::NORMAL_ARRAY);
-                }
-                ElementUsage::Color => {
-                    gl::ColorPointer(count, ty, stride, ptr);
-                    gl::EnableClientState(gl::COLOR_ARRAY);
-                }
-                ElementUsage::Texture(index) => {
-                    gl::ClientActiveTexture(gl::TEXTURE0 + *index);
-                    gl::TexCoordPointer(count, ty, stride, ptr);
-                    gl::EnableClientState(gl::TEXTURE_COORD_ARRAY);
-                    gl::ClientActiveTexture(gl::TEXTURE0);
-                }
-                ElementUsage::Generic(index) => {
-                    gl::EnableVertexAttribArray(*index);
-                    gl::VertexAttribPointer(*index, count, ty, 0, stride, ptr);
-                }
+    pub unsafe fn begin<E: Element>(&self, stride: i32, ptr: *const c_void) {
+        let count = E::len() as GLint;
+        let ty = E::gl();
+        match self {
+            ElementUsage::Position => {
+                gl::VertexPointer(count, ty, stride, ptr);
+                gl::EnableClientState(gl::VERTEX_ARRAY);
+            }
+            ElementUsage::Normal => {
+                gl::NormalPointer(ty, stride, ptr);
+                gl::EnableClientState(gl::NORMAL_ARRAY);
+            }
+            ElementUsage::Color => {
+                gl::ColorPointer(count, ty, stride, ptr);
+                gl::EnableClientState(gl::COLOR_ARRAY);
+            }
+            ElementUsage::Texture(index) => {
+                gl::ClientActiveTexture(gl::TEXTURE0 + *index);
+                gl::TexCoordPointer(count, ty, stride, ptr);
+                gl::EnableClientState(gl::TEXTURE_COORD_ARRAY);
+                gl::ClientActiveTexture(gl::TEXTURE0);
+            }
+            ElementUsage::Generic(index) => {
+                gl::EnableVertexAttribArray(*index);
+                gl::VertexAttribPointer(*index, count, ty, 0, stride, ptr);
             }
         }
     }
 
     #[inline(always)]
-    fn end(&self) {
-        unsafe {
-            match self {
-                ElementUsage::Position => {
-                    gl::DisableClientState(gl::VERTEX_ARRAY);
-                }
-                ElementUsage::Normal => {
-                    gl::DisableClientState(gl::NORMAL_ARRAY);
-                }
-                ElementUsage::Color => {
-                    gl::DisableClientState(gl::COLOR_ARRAY);
-                }
-                ElementUsage::Texture(index) => {
-                    gl::ClientActiveTexture(gl::TEXTURE0 + *index);
-                    gl::DisableClientState(gl::TEXTURE_COORD_ARRAY);
-                    gl::ClientActiveTexture(gl::TEXTURE0);
-                }
-                ElementUsage::Generic(index) => {
-                    gl::DisableVertexAttribArray(*index);
-                }
+    pub unsafe fn end(&self) {
+        match self {
+            ElementUsage::Position => {
+                gl::DisableClientState(gl::VERTEX_ARRAY);
+            }
+            ElementUsage::Normal => {
+                gl::DisableClientState(gl::NORMAL_ARRAY);
+            }
+            ElementUsage::Color => {
+                gl::DisableClientState(gl::COLOR_ARRAY);
+            }
+            ElementUsage::Texture(index) => {
+                gl::ClientActiveTexture(gl::TEXTURE0 + *index);
+                gl::DisableClientState(gl::TEXTURE_COORD_ARRAY);
+                gl::ClientActiveTexture(gl::TEXTURE0);
+            }
+            ElementUsage::Generic(index) => {
+                gl::DisableVertexAttribArray(*index);
             }
         }
     }
