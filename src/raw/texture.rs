@@ -1,6 +1,7 @@
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use bytemuck::{AnyBitPattern, NoUninit, Zeroable};
+use cgmath::{Array, Vector4};
 use crate::gl;
 use crate::state::GraphicsContext;
 use crate::tessellator::Color;
@@ -471,4 +472,260 @@ impl<'a> Texture<'a> for &'a mut TextureId {
             texture: self
         })
     }
+}
+
+impl GraphicsContext {
+    pub fn set_tex_env_mode(&self, function: TextureFunction) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::TEXTURE_ENV_MODE, function as _);
+        }
+    }
+    
+    pub fn set_tex_env_lod_bias(&self, bias: f32) {
+        unsafe {
+            gl::TexEnvf(gl::TEXTURE_ENV, gl::TEXTURE_LOD_BIAS, bias);
+        }
+    }
+
+    pub fn set_tex_env_color(&self, color: Vector4<f32>) {
+        unsafe {
+            gl::TexEnvfv(gl::TEXTURE_ENV, gl::TEXTURE_ENV_COLOR, color.as_ptr());
+        }
+    }
+    
+    pub fn set_tex_env_combine_rgb(&self, function: RgbFunction) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::COMBINE_RGB, function as _);
+        }
+    }
+    
+    pub fn set_tex_env_combine_alpha(&self, function: AlphaFunction) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::COMBINE_ALPHA, function as _);
+        }
+    }
+    
+    pub fn set_tex_env_src0_rgb(&self, source: RgbSource) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::SRC0_RGB, source as _);
+        }
+    }
+    
+    pub fn set_tex_env_src1_rgb(&self, source: RgbSource) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::SRC1_RGB, source as _);
+        }
+    }
+    
+    pub fn set_tex_env_src2_rgb(&self, source: RgbSource) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::SRC2_RGB, source as _);
+        }
+    }
+
+    pub fn set_tex_env_src0_alpha(&self, source: AlphaSource) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::SRC0_ALPHA, source as _);
+        }
+    }
+    
+    pub fn set_tex_env_src1_alpha(&self, source: AlphaSource) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::SRC1_ALPHA, source as _);
+        }
+    }
+    
+    pub fn set_tex_env_src2_alpha(&self, source: AlphaSource) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::SRC2_ALPHA, source as _);
+        }
+    }
+    
+    pub fn set_tex_env_operand0_rgb(&self, operand: RgbOperand) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::OPERAND0_RGB, operand as _);
+        }
+    }
+    
+    pub fn set_tex_env_operand1_rgb(&self, operand: RgbOperand) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::OPERAND1_RGB, operand as _);
+        }
+    }
+    
+    pub fn set_tex_env_operand2_rgb(&self, operand: RgbOperand) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::OPERAND2_RGB, operand as _);
+        }
+    }
+    
+    pub fn set_tex_env_operand0_alpha(&self, operand: AlphaOperand) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::OPERAND0_ALPHA, operand as _);
+        }
+    }
+    
+    pub fn set_tex_env_operand1_alpha(&self, operand: AlphaOperand) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::OPERAND1_ALPHA, operand as _);
+        }
+    }
+    
+    pub fn set_tex_env_operand2_alpha(&self, operand: AlphaOperand) {
+        unsafe {
+            gl::TexEnvi(gl::TEXTURE_ENV, gl::OPERAND2_ALPHA, operand as _);
+        }
+    }
+    
+    pub fn set_tex_env_scale_rgb(&self, scale: Scale) {
+        unsafe {
+            gl::TexEnvf(gl::TEXTURE_ENV, gl::RGB_SCALE, scale as u32 as f32);
+        }
+    }
+    
+    pub fn set_tex_env_scale_alpha(&self, scale: Scale) {
+        unsafe {
+            gl::TexEnvf(gl::TEXTURE_ENV, gl::ALPHA_SCALE, scale as u32 as f32);
+        }
+    }
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone, Default)]
+#[repr(u32)]
+pub enum TextureFunction {
+    #[default]
+    Modulate = gl::MODULATE,
+    Decal = gl::DECAL,
+    Blend = gl::BLEND,
+    Replace = gl::REPLACE,
+    Add = gl::ADD,
+    Combine = gl::COMBINE,
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone)]
+#[repr(u32)]
+pub enum RgbFunction {
+    Replace = gl::REPLACE,
+    Modulate = gl::MODULATE,
+    Add = gl::ADD,
+    AddSigned = gl::ADD_SIGNED,
+    Interpolate = gl::INTERPOLATE,
+    Subtract = gl::SUBTRACT,
+    Dot3Rgb = gl::DOT3_RGB,
+    Dot3Rgba = gl::DOT3_RGBA,
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone)]
+#[repr(u32)]
+pub enum AlphaFunction {
+    Replace = gl::REPLACE,
+    Modulate = gl::MODULATE,
+    Add = gl::ADD,
+    AddSigned = gl::ADD_SIGNED,
+    Interpolate = gl::INTERPOLATE,
+    Subtract = gl::SUBTRACT,
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone)]
+#[repr(u32)]
+pub enum RgbSource {
+    Constant = gl::CONSTANT,
+    PrimaryColor = gl::PRIMARY_COLOR,
+    Previous = gl::PREVIOUS,
+    Texture = gl::TEXTURE,
+    Texture1 = gl::TEXTURE1,
+    Texture2 = gl::TEXTURE2,
+    Texture3 = gl::TEXTURE3,
+    Texture4 = gl::TEXTURE4,
+    Texture5 = gl::TEXTURE5,
+    Texture6 = gl::TEXTURE6,
+    Texture7 = gl::TEXTURE7,
+    Texture8 = gl::TEXTURE8,
+    Texture9 = gl::TEXTURE9,
+    Texture10 = gl::TEXTURE10,
+    Texture11 = gl::TEXTURE11,
+    Texture12 = gl::TEXTURE12,
+    Texture13 = gl::TEXTURE13,
+    Texture14 = gl::TEXTURE14,
+    Texture15 = gl::TEXTURE15,
+    Texture16 = gl::TEXTURE16,
+    Texture17 = gl::TEXTURE17,
+    Texture18 = gl::TEXTURE18,
+    Texture19 = gl::TEXTURE19,
+    Texture20 = gl::TEXTURE20,
+    Texture21 = gl::TEXTURE21,
+    Texture22 = gl::TEXTURE22,
+    Texture23 = gl::TEXTURE23,
+    Texture24 = gl::TEXTURE24,
+    Texture25 = gl::TEXTURE25,
+    Texture26 = gl::TEXTURE26,
+    Texture27 = gl::TEXTURE27,
+    Texture28 = gl::TEXTURE28,
+    Texture29 = gl::TEXTURE29,
+    Texture30 = gl::TEXTURE30,
+    Texture31 = gl::TEXTURE31,
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone)]
+#[repr(u32)]
+pub enum RgbOperand {
+    SourceColor = gl::SRC_COLOR,
+    OneMinusSourceColor = gl::ONE_MINUS_SRC_COLOR,
+    SourceAlpha = gl::SRC0_ALPHA,
+    OneMinusSourceAlpha = gl::ONE_MINUS_SRC_ALPHA,
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone)]
+#[repr(u32)]
+pub enum AlphaSource {
+    Constant = gl::CONSTANT,
+    PrimaryColor = gl::PRIMARY_COLOR,
+    Previous = gl::PREVIOUS,
+    Texture = gl::TEXTURE,
+    Texture1 = gl::TEXTURE1,
+    Texture2 = gl::TEXTURE2,
+    Texture3 = gl::TEXTURE3,
+    Texture4 = gl::TEXTURE4,
+    Texture5 = gl::TEXTURE5,
+    Texture6 = gl::TEXTURE6,
+    Texture7 = gl::TEXTURE7,
+    Texture8 = gl::TEXTURE8,
+    Texture9 = gl::TEXTURE9,
+    Texture10 = gl::TEXTURE10,
+    Texture11 = gl::TEXTURE11,
+    Texture12 = gl::TEXTURE12,
+    Texture13 = gl::TEXTURE13,
+    Texture14 = gl::TEXTURE14,
+    Texture15 = gl::TEXTURE15,
+    Texture16 = gl::TEXTURE16,
+    Texture17 = gl::TEXTURE17,
+    Texture18 = gl::TEXTURE18,
+    Texture19 = gl::TEXTURE19,
+    Texture20 = gl::TEXTURE20,
+    Texture21 = gl::TEXTURE21,
+    Texture22 = gl::TEXTURE22,
+    Texture23 = gl::TEXTURE23,
+    Texture24 = gl::TEXTURE24,
+    Texture25 = gl::TEXTURE25,
+    Texture26 = gl::TEXTURE26,
+    Texture27 = gl::TEXTURE27,
+    Texture28 = gl::TEXTURE28,
+    Texture29 = gl::TEXTURE29,
+    Texture30 = gl::TEXTURE30,
+    Texture31 = gl::TEXTURE31,
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone)]
+#[repr(u32)]
+pub enum AlphaOperand {
+    SourceAlpha = gl::SRC0_ALPHA,
+    OneMinusSourceAlpha = gl::ONE_MINUS_SRC_ALPHA,
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Copy, Clone)]
+#[repr(u32)]
+pub enum Scale {
+    One = 1,
+    Two = 2,
+    Four = 4,
 }
