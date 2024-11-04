@@ -8,7 +8,7 @@ use crate::tessellator::Vertex;
 macro_rules! uniform {
     ($structure: ident { $($name:ident : $ty:ty),+ }) => {
         pub struct $structure<'a, V> {
-            $($name: $crate::shader::UniformLocation<'a, $ty, V>),+
+            $($name: $crate::shader::UniformLocation<'a, 'static, $ty, V>),+
         }
 
         impl<'a, V> $structure<'a, V> where V: $crate::tessellator::Vertex {

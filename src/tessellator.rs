@@ -60,16 +60,12 @@ impl Element for Color {
 pub mod formats {
     use super::Color;
     use super::ElementUsage;
-    use super::Vertex;
-    use super::VertexSource;
-    use super::Element;
     use crate::gl;
     use crate::state::draw::DrawMode;
     use crate::shader::{LinkedProgramId};
     use cgmath::{Matrix4, Matrix, Vector3};
-    use bytemuck::NoUninit;
-    use crate::matrix::MatrixMode;
 
+    #[macro_export]
     macro_rules! vertex {
         ($name:ident($(#[$usage:expr] $field:ident : $ty:ty),*)) => {
             #[repr(C)]
@@ -78,15 +74,15 @@ pub mod formats {
                 $(pub $field: $ty),+
             }
 
-            unsafe impl NoUninit for $name {}
+            unsafe impl bytemuck::NoUninit for $name {}
 
-            impl Vertex for $name {
+            impl $crate::tessellator::Vertex for $name {
                 unsafe fn enable_client_state(start: *const $name) {
                     let size = std::mem::size_of::<Self>();
                     $(
                         let offset = field_offset::offset_of!(Self => $field);
-                        let len = <$ty as Element>::len();
-                        let gl = <$ty as Element>::gl();
+                        let len = <$ty as $crate::tessellator::Element>::len();
+                        let gl = <$ty as $crate::tessellator::Element>::gl();
                         let usage = $usage;
                         usage.begin(len as _, gl, size as i32, offset.apply_ptr(start).cast());
                     )*
@@ -99,13 +95,13 @@ pub mod formats {
                 }
 
                 #[inline(always)]
-                fn draw<S: VertexSource<$name>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>) {
+                fn draw<S: $crate::tessellator::VertexSource<$name>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>) {
                     let count = source.count();
                     if count > 0 {
                         let _guard = source.bind();
                         unsafe {
                             Self::enable_client_state(source.start());
-                            crate::matrix::load(matrix, MatrixMode::ModelView);
+                            crate::matrix::load(matrix, $crate::matrix::MatrixMode::ModelView);
                             gl::UseProgram(program.map_or(0, |p| p.id()));
                             gl::DrawArrays(mode as _, 0, count as i32);
                             Self::disable_client_state();
@@ -119,11 +115,10 @@ pub mod formats {
                     $(
                         unsafe {
                             const CNAME: &[u8] = concat!(stringify!($field), "\u{0000}").as_bytes();
-                            let attribute = program.attribute::<$ty>(
-                                unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(CNAME) }
-                            ).ok_or($crate::shader::ProgramError::AttributeMissing(stringify!($field)))?;
-
-                            gl::BindAttribLocation(program.0.get(), id, CNAME.as_ptr() as _);
+                            let name = unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(CNAME) };
+                            let attribute = program.attribute::<$ty>(name)
+                                .ok_or($crate::shader::ProgramError::AttributeMissing(stringify!($field)))?;
+                            attribute.bind(id);
                             id += 1;
                         }
                     )*
@@ -139,7 +134,7 @@ pub mod formats {
                 }
             }
 
-            unsafe impl<R> VertexSource<$name> for R where R: AsRef<[$name]> {
+            unsafe impl<R> $crate::tessellator::VertexSource<$name> for R where R: AsRef<[$name]> {
                 type Guard<'a> = () where Self: 'a;
 
                 fn start(&self) -> *const $name {

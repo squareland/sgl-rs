@@ -207,7 +207,7 @@ impl Drop for ProgramId {
 }
 
 impl<V: Vertex> LinkedProgramId<V> {
-    pub fn uniform<U>(&self, name: &CStr) -> Option<UniformLocation<U, V>> where U: UniformValue {
+    pub fn uniform<'a, 'b, U>(&'a self, name: &'b CStr) -> Option<UniformLocation<'a, 'b, U, V>> where U: UniformValue {
         unsafe {
             let location = gl::GetUniformLocation(self.id(), name.as_ptr());
             if location == -1 {
@@ -216,12 +216,13 @@ impl<V: Vertex> LinkedProgramId<V> {
             Some(UniformLocation {
                 program: self,
                 location,
+                name,
                 _ty: PhantomData
             })
         }
     }
 
-    pub fn attribute<A>(&self, name: &CStr) -> Option<AttributeLocation<A, V>> {
+    pub fn attribute<'a, 'b, A>(&'a self, name: &'b CStr) -> Option<AttributeLocation<'a, 'b, A, V>> {
         unsafe {
             let location = gl::GetAttribLocation(self.id(), name.as_ptr());
             if location == -1 {
@@ -230,6 +231,7 @@ impl<V: Vertex> LinkedProgramId<V> {
             Some(AttributeLocation {
                 program: self,
                 location,
+                name,
                 _ty: PhantomData
             })
         }
@@ -435,19 +437,27 @@ pub trait Program {
     fn from_source(context: GraphicsContext, vertex: &str, fragment: &str) -> Result<Self, ProgramError> where Self: Sized;
 }
 
-pub struct AttributeLocation<'a, A, V> {
+pub struct AttributeLocation<'a, 'b, A, V> {
     program: &'a LinkedProgramId<V>,
     location: GLint,
+    name: &'b CStr,
     _ty: PhantomData<A>
 }
 
-pub struct UniformLocation<'a, U, A> {
-    program: &'a LinkedProgramId<A>,
-    location: GLint,
-    _ty: PhantomData<&'a U>
+impl<'a, 'b, A, V> AttributeLocation<'a, 'b, A, V> {
+    pub unsafe fn bind(&self, id: u32) {
+        gl::BindAttribLocation(self.program.id(), id, self.name.as_ptr() as _);
+    }
 }
 
-impl<'a, U, V> UniformLocation<'a, U, V> where U: UniformValue {
+pub struct UniformLocation<'a, 'b, U, A> {
+    program: &'a LinkedProgramId<A>,
+    location: GLint,
+    name: &'b CStr,
+    _ty: PhantomData<U>
+}
+
+impl<'a, 'b, U, V> UniformLocation<'a, 'b, U, V> where U: UniformValue {
     pub fn set(&self, value: U) {
         U::set(value, self.location);
     }
