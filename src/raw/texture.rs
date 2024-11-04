@@ -406,18 +406,6 @@ pub unsafe trait Pixel: NoUninit + AnyBitPattern {
     fn size() -> usize;
 }
 
-unsafe impl Pixel for u8 {
-    #[inline(always)]
-    fn gl_type() -> GLenum {
-        gl::UNSIGNED_BYTE
-    }
-
-    #[inline(always)]
-    fn size() -> usize {
-        4
-    }
-}
-
 unsafe impl NoUninit for Color {}
 
 unsafe impl AnyBitPattern for Color {}
@@ -439,7 +427,7 @@ unsafe impl Pixel for Color {
 unsafe impl Pixel for u32 {
     #[inline(always)]
     fn gl_type() -> GLenum {
-        gl::UNSIGNED_INT
+        gl::UNSIGNED_BYTE
     }
 
     #[inline(always)]

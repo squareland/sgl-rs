@@ -33,7 +33,7 @@ impl Framebuffer {
         bound_texture.wrap_t(TextureWrap::ClampToBorder); // FIXME: gl::CLAMP
         bound_texture.min_filter(MinFilter::Nearest);
         bound_texture.mag_filter(MagFilter::Nearest);
-        bound_texture.set_image::<u8>(0, InternalTextureFormat::RGBA8, width, height, UploadPixelFormat::RGBA, None);
+        bound_texture.set_image::<u32>(0, InternalTextureFormat::RGBA8, width, height, UploadPixelFormat::RGBA, None);
         let bound_frame = id.bind();
         bound_frame.attach_texture(gl::COLOR_ATTACHMENT0, &bound_texture, 0);
         if let Some(ref d) = depth {

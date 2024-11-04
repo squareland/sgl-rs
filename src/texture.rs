@@ -86,7 +86,7 @@ fn blend_colors<const N: usize>(colors: [u32; N], has_alpha: bool) -> u32 {
     }
 }
 
-fn generate_mipmap(levels: u32, width: u32, data: Option<&[u8]>) -> Vec<Cow<[u8]>> {
+fn generate_mipmap(levels: u32, width: u32, data: Option<&[u32]>) -> Vec<Cow<[u32]>> {
     let mut layers = Vec::with_capacity(levels as usize + 1);
     let Some(data) = data else {
         return layers;
@@ -94,12 +94,10 @@ fn generate_mipmap(levels: u32, width: u32, data: Option<&[u8]>) -> Vec<Cow<[u8]
 
     layers.push(Cow::Borrowed(data));
 
-    let data = bytemuck::cast_slice::<_, u32>(data);
-
     let alpha = data.iter().any(|&b| (b >> 24) == 0);
 
     for level in 1..=levels {
-        let previous = bytemuck::cast_slice::<_, u32>(&layers[level as usize - 1]);
+        let previous = &layers[level as usize - 1];
         let mut current = vec![0; previous.len() >> 2];
         let w = width >> level;
         if w > 0 {
@@ -120,17 +118,13 @@ fn generate_mipmap(levels: u32, width: u32, data: Option<&[u8]>) -> Vec<Cow<[u8]
             }
         }
 
-        unsafe {
-            let (ptr, len, capacity) = current.into_raw_parts();
-            let layer = Vec::from_raw_parts(ptr as *mut u8, len * 4, capacity * 4);
-            layers.push(Cow::Owned(layer));
-        }
+        layers.push(Cow::Owned(current));
     }
 
     layers
 }
 
-pub fn allocate<C: Into<GraphicsContext>>(width: u32, height: u32, data: Option<&[u8]>, params: &TextureParameters, c: C) -> TextureId {
+pub fn allocate<C: Into<GraphicsContext>>(width: u32, height: u32, data: Option<&[u32]>, params: &TextureParameters, c: C) -> TextureId {
     let texture = c.into().gen_texture().expect("Unable to allocate texture");
     let bound = texture.bind();
     bound.wrap_s(params.wrap_s);
@@ -161,14 +155,14 @@ pub fn from_memory<C: Into<GraphicsContext>>(data: &[u8], format: ImageFormat, p
     let source = image::load_from_memory_with_format(data, format)
         .expect("Failed to load texture from memory")
         .into_rgba8();
-    allocate(source.width(), source.height(), Some(source.as_raw()), params, c)
+    allocate(source.width(), source.height(), Some(bytemuck::cast_slice(source.as_raw())), params, c)
 }
 
 pub fn from_file<P: AsRef<Path>, C: Into<GraphicsContext>>(path: P, params: &TextureParameters, c: C) -> TextureId {
     let source = image::open(path)
         .expect("Failed to open texture file")
         .into_rgba8();
-    allocate(source.width(), source.height(), Some(source.as_raw()), params, c)
+    allocate(source.width(), source.height(), Some(bytemuck::cast_slice(source.as_raw())), params, c)
 }
 
 pub fn download<P: AsRef<Path>>(texture: &TextureGuard, format: DownloadPixelFormat, layer: u32, path: P) {
