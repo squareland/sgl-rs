@@ -103,6 +103,7 @@ impl<P> PixelPackBuffer<P> where P: Pixel {
     #[inline(always)]
     pub fn download(&self, x: u32, y: u32, width: u32, height: u32, format: PixelFormat) -> Sync {
         assert!(self.size > 0, "cannot download to unallocated buffer");
+        assert_eq!(self.size, P::size() * (width * height) as usize, "buffer size mismatch");
         unsafe {
             self.id.bind().read_pixels::<P>(x, y, width, height, format)
         }
