@@ -446,6 +446,28 @@ unsafe impl Pixel for u32 {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
+pub struct Depth(pub u32);
+
+unsafe impl NoUninit for Depth {}
+
+unsafe impl AnyBitPattern for Depth {}
+
+unsafe impl Zeroable for Depth {}
+
+unsafe impl Pixel for Depth {
+    #[inline(always)]
+    fn gl_type() -> GLenum {
+        gl::UNSIGNED_INT
+    }
+
+    #[inline(always)]
+    fn size() -> usize {
+        4
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
 pub struct Stencil(pub u32);
 
 unsafe impl NoUninit for Stencil {}
