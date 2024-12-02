@@ -14,6 +14,7 @@ pub struct Framebuffer {
     id: FramebufferId,
     texture: TextureId,
     depth: Option<RenderbufferId>,
+    stencil: bool,
     width: u32,
     height: u32,
     texture_width: u32,
@@ -23,7 +24,7 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
-    pub fn new<C: Into<GraphicsContext>>(width: u32, height: u32, color: [f32; 4], depth: bool, c: C) -> Result<Self, FramebufferStatus> {
+    pub fn new<C: Into<GraphicsContext>>(width: u32, height: u32, color: [f32; 4], depth: bool, stencil: bool, c: C) -> Result<Self, FramebufferStatus> {
         let context = c.into();
         let id = context.gen_framebuffer().expect("Could not allocate framebuffer");
         let texture = context.gen_texture().expect("Could not allocate texture");
@@ -38,8 +39,14 @@ impl Framebuffer {
         bound_frame.attach_texture(gl::COLOR_ATTACHMENT0, &bound_texture, 0);
         if let Some(ref d) = depth {
             let bound = d.bind();
-            bound.storage(gl::DEPTH_COMPONENT24, width, height);
-            bound_frame.renderbuffer(gl::DEPTH_ATTACHMENT, &bound);
+            if stencil {
+                bound.storage(gl::DEPTH24_STENCIL8, width, height);
+                bound_frame.renderbuffer(gl::DEPTH_ATTACHMENT, &bound);
+                bound_frame.renderbuffer(gl::STENCIL_ATTACHMENT, &bound);
+            } else {
+                bound.storage(gl::DEPTH_COMPONENT24, width, height);
+                bound_frame.renderbuffer(gl::DEPTH_ATTACHMENT, &bound);    
+            }
         }
 
         let [r, g, b, a] = color;
@@ -62,6 +69,7 @@ impl Framebuffer {
                 id,
                 texture,
                 depth,
+                stencil,
                 width,
                 height,
                 texture_width: width,
