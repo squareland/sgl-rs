@@ -1,5 +1,6 @@
 use core::cmp::{Eq, PartialEq};
 use std::ffi::{c_void, CStr};
+use crate::state::GraphicsContext;
 use super::gl;
 use super::raw::{GLenum, GLuint, GLsizei, GLchar};
 
@@ -126,5 +127,17 @@ pub fn enable<C>(callback: C) where C: FnMut(DebugSource, DebugSeverity, DebugTy
     unsafe {
         gl::Enable(gl::DEBUG_OUTPUT);
         gl::DebugMessageCallback(Some(debug_callback), Box::into_raw(callback).cast());
+    }
+}
+
+impl GraphicsContext {
+    pub fn debug_group<G>(&self, id: u32, name: &'static str, mut group: G) where G: FnMut() {
+        unsafe {
+            gl::PushDebugGroup(gl::DEBUG_SOURCE_APPLICATION, id as _, name.len() as _, name.as_ptr().cast());
+        }
+        group();
+        unsafe {
+            gl::PopDebugGroup();
+        }
     }
 }
