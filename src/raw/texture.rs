@@ -181,6 +181,20 @@ impl<'texture> TextureGuard<'texture> {
     }
 
     #[inline(always)]
+    pub fn depth_mode(&self, mode: DepthTextureMode) {
+        unsafe {
+            gl::TexParameteri(gl::TEXTURE_2D, gl::DEPTH_TEXTURE_MODE, mode as _);
+        }
+    }
+
+    #[inline(always)]
+    pub fn compare_func(&self, func: TextureFunc) {
+        unsafe {
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_COMPARE_FUNC, func as _);
+        }
+    }
+
+    #[inline(always)]
     pub fn get_image<P>(&self, level: u32, format: DownloadPixelFormat, width: u32, height: u32, pixels: &mut [P]) where P: Pixel {
         let bytes: &mut [u8] = bytemuck::cast_slice_mut(pixels);
         let size = P::size() * (width * height) as usize;
@@ -375,6 +389,28 @@ impl InternalTextureFormat {
             Self::RGBA32UI => BaseTextureFormat::RGBA,
         }
     }
+}
+
+#[repr(u32)]
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub enum DepthTextureMode {
+    #[default]
+    Luminance = gl::LUMINANCE,
+    Intensity = gl::INTENSITY,
+    Alpha = gl::ALPHA
+}
+
+#[repr(u32)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub enum TextureFunc {
+    Always = gl::ALWAYS,
+    Never = gl::NEVER,
+    Less = gl::LESS,
+    LessOrEqual = gl::LEQUAL,
+    Greater = gl::GREATER,
+    GreaterOrEqual = gl::GEQUAL,
+    Equal = gl::EQUAL,
+    NotEqual = gl::NOTEQUAL,
 }
 
 #[repr(u32)]
