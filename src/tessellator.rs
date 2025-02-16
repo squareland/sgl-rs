@@ -11,7 +11,7 @@ use super::gl::{GLenum, GLint};
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
-pub struct Color(u8, u8, u8, u8);
+pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
 impl From<u32> for Color {
     #[inline(always)]
@@ -33,7 +33,11 @@ impl From<[f32; 4]> for Color {
     #[inline(always)]
     fn from(value: [f32; 4]) -> Self {
         let [r, g, b, a] = value;
-        Self((r / 255.0) as u8, (g / 255.0) as u8, (b / 255.0) as u8, (a / 255.0) as u8)
+        let r = (r.clamp(0.0, 1.0) * 255.0) as u8;
+        let g = (g.clamp(0.0, 1.0) * 255.0) as u8;
+        let b = (b.clamp(0.0, 1.0) * 255.0) as u8;
+        let a = (a.clamp(0.0, 1.0) * 255.0) as u8;
+        Self(r, g, b, a)
     }
 }
 
