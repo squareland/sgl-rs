@@ -544,36 +544,36 @@ impl UniformValue for Sampler2d {
 }
 
 pub trait Texture<'a> {
-    fn bind(self) -> Rc<TextureGuard<'a>>;
+    fn bind(self) -> TextureGuard<'a>;
 }
 
 impl<'a> Texture<'a> for &'a TextureId {
     #[inline(always)]
-    fn bind(self) -> Rc<TextureGuard<'a>> {
+    fn bind(self) -> TextureGuard<'a> {
         let mut unit = 0;
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.0.get());
             gl::GetIntegerv(gl::ACTIVE_TEXTURE, &mut unit);
         };
-        Rc::new(TextureGuard {
+        TextureGuard {
             texture: self,
             unit
-        })
+        }
     }
 }
 
 impl<'a> Texture<'a> for &'a mut TextureId {
     #[inline(always)]
-    fn bind(self) -> Rc<TextureGuard<'a>> {
+    fn bind(self) -> TextureGuard<'a> {
         let mut unit = 0;
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.0.get());
             gl::GetIntegerv(gl::ACTIVE_TEXTURE, &mut unit);
         }
-        Rc::new(TextureGuard {
+        TextureGuard {
             texture: self,
             unit
-        })
+        }
     }
 }
 

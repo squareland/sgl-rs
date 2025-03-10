@@ -131,7 +131,7 @@ impl Framebuffer {
 
 impl<'a> Texture<'a> for &'a Framebuffer {
     #[inline(always)]
-    fn bind(self) -> Rc<TextureGuard<'a>> {
+    fn bind(self) -> TextureGuard<'a> {
         self.texture.bind()
     }
 }
