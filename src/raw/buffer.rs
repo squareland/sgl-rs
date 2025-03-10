@@ -134,16 +134,64 @@ impl<'buffer> FramebufferGuard<'buffer> {
     }
 
     #[inline(always)]
-    pub fn attach_texture(&self, attachment: GLenum, texture: &TextureGuard, level: i32) {
+    pub fn attach_color_texture(&self, i: u32, texture: &TextureGuard) {
         unsafe {
-            gl::FramebufferTexture2D(gl::FRAMEBUFFER, attachment, gl::TEXTURE_2D, texture.id().get(), level)
+            let mut max = 0;
+            gl::GetIntegerv(gl::MAX_COLOR_ATTACHMENTS, &mut max);
+            assert!(i < max as u32, "color attachment id is larger than maximum supported: {} > {}", i, max - 1);
+            gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0 + i, gl::TEXTURE_2D, texture.id().get(), 0)
         }
     }
 
     #[inline(always)]
-    pub fn renderbuffer(&self, attachment: GLenum, render: &RenderbufferGuard) {
+    pub fn attach_color_buffer(&self, i: u32, render: &RenderbufferGuard) {
         unsafe {
-            gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, attachment, gl::RENDERBUFFER, render.buffer.0.get());
+            let mut max = 0;
+            gl::GetIntegerv(gl::MAX_COLOR_ATTACHMENTS, &mut max);
+            assert!(i < max as u32, "color attachment id is larger than maximum supported: {} > {}", i, max - 1);
+            gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0 + i, gl::RENDERBUFFER, render.buffer.0.get());
+        }
+    }
+
+    #[inline(always)]
+    pub fn attach_depth_buffer(&self, render: &RenderbufferGuard) {
+        unsafe {
+            gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::RENDERBUFFER, render.buffer.0.get());
+        }
+    }
+
+    #[inline(always)]
+    pub fn attach_depth_texture(&self, texture: &TextureGuard) {
+        unsafe {
+            gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::TEXTURE_2D, texture.id().get(), 0);
+        }
+    }
+
+    #[inline(always)]
+    pub fn attach_stencil_buffer(&self, render: &RenderbufferGuard) {
+        unsafe {
+            gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::STENCIL_ATTACHMENT, gl::RENDERBUFFER, render.buffer.0.get());
+        }
+    }
+
+    #[inline(always)]
+    pub fn attach_stencil_texture(&self, texture: &TextureGuard) {
+        unsafe {
+            gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::STENCIL_ATTACHMENT, gl::TEXTURE_2D, texture.id().get(), 0);
+        }
+    }
+
+    #[inline(always)]
+    pub fn attach_depth_stencil_buffer(&self, render: &RenderbufferGuard) {
+        unsafe {
+            gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_STENCIL_ATTACHMENT, gl::RENDERBUFFER, render.buffer.0.get());
+        }
+    }
+
+    #[inline(always)]
+    pub fn attach_depth_stencil_texture(&self, texture: &TextureGuard) {
+        unsafe {
+            gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::DEPTH_STENCIL_ATTACHMENT, gl::TEXTURE_2D, texture.id().get(), 0);
         }
     }
 }

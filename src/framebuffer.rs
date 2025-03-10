@@ -36,16 +36,16 @@ impl Framebuffer {
         bound_texture.mag_filter(MagFilter::Nearest);
         bound_texture.set_image::<u32>(0, InternalTextureFormat::RGBA8, width, height, UploadPixelFormat::RGBA, None);
         let bound_frame = id.bind();
-        bound_frame.attach_texture(gl::COLOR_ATTACHMENT0, &bound_texture, 0);
+        bound_frame.attach_color_texture(0, &bound_texture);
         if let Some(ref d) = depth {
             let bound = d.bind();
             if stencil {
                 bound.storage(gl::DEPTH24_STENCIL8, width, height);
-                bound_frame.renderbuffer(gl::DEPTH_ATTACHMENT, &bound);
-                bound_frame.renderbuffer(gl::STENCIL_ATTACHMENT, &bound);
+                bound_frame.attach_depth_buffer(&bound);
+                bound_frame.attach_stencil_buffer(&bound);
             } else {
                 bound.storage(gl::DEPTH_COMPONENT24, width, height);
-                bound_frame.renderbuffer(gl::DEPTH_ATTACHMENT, &bound);    
+                bound_frame.attach_depth_buffer(&bound);
             }
         }
 
