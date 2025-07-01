@@ -2,7 +2,7 @@ use crate::framebuffer::{BufferId, BufferKind, UploadMode};
 use crate::raw::array::VertexArrayId;
 use crate::shader::LinkedProgramId;
 use crate::state::draw::DrawMode;
-use crate::state::GraphicsContext;
+use crate::state::{DrawParams, GraphicsContext};
 use crate::tessellator::Vertex;
 use crate::texture::TextureGuard;
 use cgmath::Matrix4;
@@ -54,18 +54,18 @@ impl<V: Vertex> VertexArray<V> {
     }
 
     #[inline(always)]
-    pub fn draw(&self, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
+    pub fn draw(&self, mode: DrawMode, matrix: &Matrix4<f32>, params: &DrawParams, program: Option<&LinkedProgramId<V>>) {
         let _bound = self.id.bind();
         let count = self.vertices;
         if count > 0 {
             unsafe {
-                crate::tessellator::formats::draw(mode, count, matrix, program);
+                crate::tessellator::formats::draw(mode, count, matrix, params, program);
             }
         }
     }
 
     #[inline(always)]
-    pub fn draw_textured<'a>(&self, mode: DrawMode, matrix: &Matrix4<f32>, texture: &TextureGuard<'a>, program: Option<&LinkedProgramId<V>>) {
-        self.draw(mode, matrix, program);
+    pub fn draw_textured<'a>(&self, mode: DrawMode, matrix: &Matrix4<f32>, texture: &TextureGuard<'a>, params: &DrawParams, program: Option<&LinkedProgramId<V>>) {
+        self.draw(mode, matrix, params, program);
     }
 }

@@ -1,5 +1,5 @@
 use crate::gl;
-use crate::state::{BufferBit, GraphicsContext};
+use crate::state::{BufferBit, DrawParams, GraphicsContext, Viewport};
 use crate::texture::raw::{Texture, TextureGuard, TextureId};
 use enumflags2::BitFlags;
 use std::ops::{Add, Deref, Mul, Sub};
@@ -81,20 +81,20 @@ impl Framebuffer {
         }
     }
 
-    pub fn render<F>(&self, w: u32, h: u32, disable_blend: bool, callback: F) where F: FnOnce([([f32; 3], [f32; 2]); 4], &TextureGuard) {
+    pub fn render<F>(&self, w: u32, h: u32, disable_blend: bool, callback: F, params: &DrawParams) where F: FnOnce([([f32; 3], [f32; 2]); 4], &TextureGuard, &DrawParams) {
         let c = &self.context;
-
-        c.color_mask(true, true, true, false);
-        c.depth.disable();
-        c.depth_mask(false);
-
-        c.viewport(0, 0, w, h);
-        c.texture2d.enable();
-        c.lighting.disable();
-        c.alpha.disable();
+        let mut params = DrawParams {
+            alpha: None,
+            color_mask: (true, true, true, false),
+            depth_mask: false,
+            depth: None,
+            lighting: false,
+            viewport: Viewport { x:0, y:0, w, h },
+            .. *params
+        };
 
         if disable_blend {
-            c.blend.disable();
+            params.blend = None;
             c.color_material.enable();
         }
 
@@ -110,10 +110,7 @@ impl Framebuffer {
             ([x + w, y + h, 0.0], [tw, 0.0]),
             ([x + w, y, 0.0], [tw, th]),
             ([x, y, 0.0], [0.0, th]),
-        ], &self.texture.bind());
-
-        c.depth_mask(true);
-        c.color_mask(true, true, true, true);
+        ], &self.texture.bind(), &params);
     }
 
     pub fn clear(&mut self) {
@@ -149,6 +146,15 @@ impl Frame {
         Self { context: c.into(), start: Instant::now(), elapsed, display_width, display_height }
     }
 
+    pub fn get_viewport(&self) -> Viewport {
+        Viewport {
+            x: 0,
+            y: 0,
+            w: self.display_width,
+            h: self.display_height,
+        }
+    }
+
     pub fn elapsed(&self) -> f32 {
         self.elapsed
     }
@@ -171,10 +177,6 @@ impl Frame {
 
     pub fn aspect_ratio(&self) -> f32 {
         self.display_width as f32 / self.display_height as f32
-    }
-
-    pub fn reset_viewport(&self) {
-        self.viewport(0, 0, self.display_width, self.display_height);
     }
 }
 

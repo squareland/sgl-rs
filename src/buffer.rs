@@ -3,7 +3,7 @@ use crate::raw::fence::Sync;
 use crate::shader::LinkedProgramId;
 use crate::state::draw::DrawMode;
 use crate::state::pixel::PixelFormat;
-use crate::state::GraphicsContext;
+use crate::state::{DrawParams, GraphicsContext};
 use crate::tessellator::{Vertex, VertexSource};
 use crate::texture::{Pixel, TextureGuard};
 use cgmath::Matrix4;
@@ -44,15 +44,17 @@ impl<V: Vertex> VertexBuffer<V> {
     }
 
     #[inline(always)]
-    pub fn draw(&self, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
+    pub fn draw(&self, mode: DrawMode, matrix: &Matrix4<f32>, params: &DrawParams, program: Option<&LinkedProgramId<V>>) {
+        self.context.texture2d.disable();
         let _bound = self.id.bind();
-        V::draw(self, mode, matrix, program);
+        V::draw(self, mode, matrix, params, program);
     }
 
     #[inline(always)]
-    pub fn draw_textured<'a>(&self, mode: DrawMode, matrix: &Matrix4<f32>, texture: &TextureGuard<'a>, program: Option<&LinkedProgramId<V>>) {
-        texture.context().texture2d.enable();
-        self.draw(mode, matrix, program);
+    pub fn draw_textured<'a>(&self, mode: DrawMode, matrix: &Matrix4<f32>, texture: &TextureGuard<'a>, params: &DrawParams, program: Option<&LinkedProgramId<V>>) {
+        self.context.texture2d.enable();
+        let _bound = self.id.bind();
+        V::draw(self, mode, matrix, params, program);
     }
 }
 

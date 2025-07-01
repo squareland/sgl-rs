@@ -1,5 +1,6 @@
 use std::ffi::CStr;
 use std::marker::PhantomData;
+use std::mem::transmute;
 use std::num::NonZeroU32;
 use cgmath::{Array, Vector3, Vector4};
 use enumflags2::{bitflags, BitFlags};
@@ -11,13 +12,14 @@ use crate::raw::array::VertexArrayId;
 use crate::raw::display::DisplayListIter;
 use crate::state::alpha::AlphaFunc;
 use crate::state::blend::{Blend, DstFactor, SrcFactor};
-use crate::state::color::ColorMode;
+use crate::state::color::{ColorMaterial, ColorMode};
+use crate::state::depth::DepthFunc;
 use crate::state::face::Face;
-use crate::state::fog::FogMode;
+use crate::state::fog::{Fog, FogMode};
 use crate::state::light::LightModel;
 use crate::state::pixel::PixelFormat;
 use crate::state::shade::ShadeModel;
-use crate::state::stencil::{StencilOp, StencilFunc};
+use crate::state::stencil::{StencilOp, StencilFunc, Stencil};
 use crate::texture::Pixel;
 use crate::texture::raw::TextureId;
 use super::raw::GLenum;
@@ -39,6 +41,150 @@ pub struct GraphicsContext {
     pub stencil: BooleanState<{ gl::STENCIL_TEST }>,
     pub scissor: BooleanState<{ gl::SCISSOR_TEST }>,
     _private: PhantomData<*const ()>
+}
+
+#[derive(Copy, Clone)]
+pub struct DrawParams {
+    pub alpha: Option<AlphaFunc>,
+    pub auto_normal: bool,
+    pub blend: Option<Blend>,
+    pub cull_face: Option<Face>,
+    pub depth: Option<DepthFunc>,
+    pub color_mask: (bool, bool, bool, bool),
+    pub depth_mask: bool,
+    pub dither: bool,
+    pub fog: Option<Fog>,
+    pub lighting: bool,
+    pub rescale_normal: bool,
+    pub color_material: Option<ColorMaterial>,
+    pub stencil: Option<Stencil>,
+    pub shade_model: ShadeModel,
+    pub line_width: f32,
+    pub color: Vector4<f32>,
+    pub viewport: Viewport,
+}
+
+#[derive(Copy, Clone)]
+pub struct Viewport {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+impl DrawParams {
+    pub fn default(viewport: Viewport) -> Self {
+        Self {
+            alpha: Some(AlphaFunc::Always),
+            auto_normal: false,
+            blend: Some(Blend::default()),
+            cull_face: Some(Face::Back),
+            depth: Some(DepthFunc::Less),
+            color_mask: (true, true, true, true),
+            depth_mask: true,
+            dither: false,
+            fog: None,
+            lighting: false,
+            rescale_normal: false,
+            color_material: None,
+            stencil: None,
+            shade_model: ShadeModel::Flat,
+            line_width: 1.0,
+            color: Vector4::from([1.0, 1.0, 1.0, 1.0]),
+            viewport
+        }
+    }
+
+    pub fn apply(&self, context: &mut GraphicsContext) {
+        context.viewport(self.viewport.x, self.viewport.y, self.viewport.w, self.viewport.h);
+        if let Some(alpha) = self.alpha {
+            context.alpha.enable();
+            context.alpha_func(alpha);
+        } else {
+            context.alpha.disable();
+        }
+        if self.auto_normal {
+            context.auto_normal.enable();
+        } else {
+            context.auto_normal.disable();
+        }
+        if let Some(blend) = self.blend {
+            context.blend.enable();
+            context.blend_func(blend.src_color, blend.dst_color, blend.src_alpha, blend.dst_alpha);
+        } else {
+            context.blend.disable();
+        }
+        if let Some(cull_face) = self.cull_face {
+            context.cull_face.enable();
+            context.cull_face(cull_face);
+        } else {
+            context.cull_face.disable();
+        }
+        if let Some(depth) = self.depth {
+            context.depth.enable();
+            context.depth_func(depth);
+        } else {
+            context.depth.disable();
+        }
+        let (r, g, b, a) = self.color_mask;
+        context.color_mask(r, g, b, a);
+        context.depth_mask(self.depth_mask);
+        if self.dither {
+            context.dither.enable();
+        } else {
+            context.dither.disable();
+        }
+        if let Some(fog) = self.fog {
+            context.fog_color(fog.color);
+            context.reset_color();
+            context.fog_mode(fog.mode);
+            // context.fog_density(fog.density);
+            context.fog_start(fog.start);
+            context.fog_end(fog.end);
+            if let Some(nv) = fog.nv {
+                context.fog_distance_nv(nv.distance);
+                context.fog_eye_plane_nv(nv.eye_plane);
+            }
+            context.color_material(Face::Front, ColorMode::Ambient);
+            context.color(fog.color.x, fog.color.y, fog.color.z, fog.color.z);
+            context.color_material.enable();
+            context.fog.enable();
+            context.color(fog.color.x, fog.color.y, fog.color.z, fog.color.z);
+        } else {
+            context.fog.disable();
+            context.color(self.color.x, self.color.y, self.color.z, self.color.w);
+        }
+        if self.lighting {
+            context.lighting.enable();
+        } else {
+            context.lighting.disable();
+        }
+        if self.rescale_normal {
+            context.rescale_normal.enable();
+        } else {
+            context.rescale_normal.disable();
+        }
+        if let Some(material) = self.color_material {
+            context.color_material.enable();
+            context.color_material(material.face, material.mode)
+        } else {
+            context.color_material.disable();
+        }
+        if let Some(stencil) = self.stencil {
+            context.stencil.enable();
+            if let Some(face) = stencil.face {
+                context.stencil_func_separate(face, stencil.func);
+                context.stencil_op_separate(face, stencil.stencil_fail, stencil.depth_fail, stencil.depth_pass);
+            } else {
+                context.stencil_func(stencil.func);
+                context.stencil_op(stencil.stencil_fail, stencil.depth_fail, stencil.depth_pass);
+            }
+        } else {
+            context.stencil.disable();
+        }
+        context.shade_model(self.shade_model);
+        context.line_width(self.line_width);
+    }
 }
 
 impl Clone for GraphicsContext {
@@ -165,6 +311,13 @@ impl GraphicsContext {
     }
 
     #[inline(always)]
+    pub fn cull_face(&self, face: Face) {
+        unsafe {
+            gl::CullFace(face as _);
+        }
+    }
+
+    #[inline(always)]
     pub fn gen_framebuffer(&self) -> Result<FramebufferId, GlError> {
         let mut id = 0;
         self.gen_framebuffers(std::slice::from_mut(&mut id));
@@ -284,16 +437,22 @@ impl GraphicsContext {
     }
 
     #[inline(always)]
-    pub fn stencil_func(&self, func: StencilFunc, reference: i32, mask: u32) {
+    pub fn stencil_func(&self, func: StencilFunc) {
         unsafe {
-            gl::StencilFunc(func as _, reference, mask);
+            let reference = func.reference();
+            let mask = func.mask();
+            let ord = transmute(std::mem::discriminant(&func));
+            gl::StencilFunc(ord, reference as _, mask);
         }
     }
 
     #[inline(always)]
-    pub fn stencil_func_separate(&self, face: Face, func: StencilFunc, reference: i32, mask: u32) {
+    pub fn stencil_func_separate(&self, face: Face, func: StencilFunc) {
         unsafe {
-            gl::StencilFuncSeparate(face as _, func as _, reference, mask);
+            let reference = func.reference();
+            let mask = func.mask();
+            let ord = transmute(std::mem::discriminant(&func));
+            gl::StencilFuncSeparate(face as _, ord, reference as _, mask);
         }
     }
 
@@ -346,9 +505,18 @@ impl GraphicsContext {
     }
 
     #[inline(always)]
-    pub fn alpha_func(&self, func: AlphaFunc, reference: f32) {
+    pub fn alpha_func(&self, func: AlphaFunc) {
         unsafe {
-            gl::AlphaFunc(func as _, reference);
+            let reference = func.reference();
+            let ord = transmute(std::mem::discriminant(&func));
+            gl::AlphaFunc(ord, reference);
+        }
+    }
+
+    #[inline(always)]
+    pub fn depth_func(&self, func: DepthFunc) {
+        unsafe {
+            gl::DepthFunc(func as _);
         }
     }
 
@@ -498,21 +666,51 @@ pub mod pixel {
 
 pub mod stencil {
     use crate::gl;
+    use crate::state::face::Face;
 
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     pub enum StencilFunc {
         Always = gl::ALWAYS,
         Never = gl::NEVER,
-        Less = gl::LESS,
-        LessOrEqual = gl::LEQUAL,
-        Greater = gl::GREATER,
-        GreaterOrEqual = gl::GEQUAL,
-        Equal = gl::EQUAL,
-        NotEqual = gl::NOTEQUAL,
+        Less { reference: u32, mask: u32 } = gl::LESS,
+        LessOrEqual { reference: u32, mask: u32 } = gl::LEQUAL,
+        Greater { reference: u32, mask: u32 } = gl::GREATER,
+        GreaterOrEqual { reference: u32, mask: u32 } = gl::GEQUAL,
+        Equal { reference: u32, mask: u32 } = gl::EQUAL,
+        NotEqual { reference: u32, mask: u32 } = gl::NOTEQUAL,
+    }
+
+    impl StencilFunc {
+        pub fn reference(&self) -> u32 {
+            match self {
+                StencilFunc::Always => 0,
+                StencilFunc::Never => 0,
+                StencilFunc::Less { reference, .. } => *reference,
+                StencilFunc::LessOrEqual { reference, .. } => *reference,
+                StencilFunc::Greater { reference, .. } => *reference,
+                StencilFunc::GreaterOrEqual { reference, .. } => *reference,
+                StencilFunc::Equal { reference, .. } => *reference,
+                StencilFunc::NotEqual { reference, .. } => *reference,
+            }
+        }
+
+        pub fn mask(&self) -> u32 {
+            match self {
+                StencilFunc::Always => 0,
+                StencilFunc::Never => 0,
+                StencilFunc::Less { mask, .. } => *mask,
+                StencilFunc::LessOrEqual { mask, .. } => *mask,
+                StencilFunc::Greater { mask, .. } => *mask,
+                StencilFunc::GreaterOrEqual { mask, .. } => *mask,
+                StencilFunc::Equal { mask, .. } => *mask,
+                StencilFunc::NotEqual { mask, .. } => *mask,
+            }
+        }
     }
 
     #[repr(u32)]
-    #[derive(Default)]
+    #[derive(Default, Copy, Clone)]
     pub enum StencilOp {
         #[default]
         Keep = gl::KEEP,
@@ -524,13 +722,56 @@ pub mod stencil {
         Decrement = gl::DECR,
         WrappingDecrement = gl::DECR_WRAP,
     }
+
+    #[derive(Copy, Clone)]
+    pub struct Stencil {
+        pub face: Option<Face>,
+        pub func: StencilFunc,
+        pub stencil_fail: StencilOp,
+        pub depth_fail: StencilOp,
+        pub depth_pass: StencilOp,
+    }
 }
 
 pub mod alpha {
     use crate::gl;
 
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     pub enum AlphaFunc {
+        Always = gl::ALWAYS,
+        Never = gl::NEVER,
+        Less(f32) = gl::LESS,
+        LessOrEqual(f32) = gl::LEQUAL,
+        Greater(f32) = gl::GREATER,
+        GreaterOrEqual(f32) = gl::GEQUAL,
+        Equal(f32) = gl::EQUAL,
+        NotEqual(f32) = gl::NOTEQUAL,
+    }
+
+    impl AlphaFunc {
+        #[inline(always)]
+        pub fn reference(&self) -> f32 {
+            match self {
+                AlphaFunc::Always => 0.0,
+                AlphaFunc::Never => 0.0,
+                AlphaFunc::Less(r) => *r,
+                AlphaFunc::LessOrEqual(r) => *r,
+                AlphaFunc::Greater(r) => *r,
+                AlphaFunc::GreaterOrEqual(r) => *r,
+                AlphaFunc::Equal(r) => *r,
+                AlphaFunc::NotEqual(r) => *r,
+            }
+        }
+    }
+}
+
+pub mod depth {
+    use crate::gl;
+
+    #[repr(u32)]
+    #[derive(Copy, Clone)]
+    pub enum DepthFunc {
         Always = gl::ALWAYS,
         Never = gl::NEVER,
         Less = gl::LESS,
@@ -543,13 +784,31 @@ pub mod alpha {
 }
 
 pub mod fog {
+    use cgmath::Vector4;
     use crate::gl;
 
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     pub enum FogMode {
         Linear = gl::LINEAR,
         Exp = gl::EXP,
         Exp2 = gl::EXP2,
+    }
+
+    #[derive(Copy, Clone)]
+    pub struct Fog {
+        pub mode: FogMode,
+        pub density: f32,
+        pub start: f32,
+        pub end: f32,
+        pub color: Vector4<f32>,
+        pub nv: Option<NvFog>,
+    }
+
+    #[derive(Copy, Clone)]
+    pub struct NvFog {
+        pub distance: super::nv::FogMode,
+        pub eye_plane: super::nv::FogEyePlane,
     }
 }
 
@@ -557,6 +816,7 @@ pub mod blend {
     use crate::gl;
 
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     pub enum SrcFactor {
         ConstantAlpha = gl::CONSTANT_ALPHA,
         ConstantColor = gl::CONSTANT_COLOR,
@@ -576,6 +836,7 @@ pub mod blend {
     }
 
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     pub enum DstFactor {
         ConstantAlpha = gl::CONSTANT_ALPHA,
         ConstantColor = gl::CONSTANT_COLOR,
@@ -593,6 +854,8 @@ pub mod blend {
         Zero = gl::ZERO
     }
 
+
+    #[derive(Copy, Clone)]
     pub struct Blend {
         pub src_color: SrcFactor,
         pub dst_color: DstFactor,
@@ -616,6 +879,7 @@ pub mod shade {
     use crate::gl;
 
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     pub enum ShadeModel {
         Smooth = gl::SMOOTH,
         Flat = gl::FLAT
@@ -772,18 +1036,21 @@ pub mod face {
     use crate::gl;
 
     #[repr(u32)]
+    #[derive(Default, Copy, Clone)]
     pub enum Face {
         Front = gl::FRONT,
         Back = gl::BACK,
+        #[default]
         FrontAndBack = gl::FRONT_AND_BACK,
     }
 }
 
 pub mod color {
     use crate::gl;
+    use crate::state::face::Face;
 
     #[repr(u32)]
-    #[derive(Default)]
+    #[derive(Default, Copy, Clone)]
     pub enum ColorMode {
         Emission = gl::EMISSION,
         Ambient = gl::AMBIENT,
@@ -791,6 +1058,12 @@ pub mod color {
         Specular = gl::SPECULAR,
         #[default]
         AmbientAndDiffuse = gl::AMBIENT_AND_DIFFUSE
+    }
+
+    #[derive(Default, Copy, Clone)]
+    pub struct ColorMaterial {
+        pub face: Face,
+        pub mode: ColorMode,
     }
 }
 
@@ -802,11 +1075,13 @@ pub mod nv {
     pub const FOG_EYE_PLANE_ABSOLUTE_NV: GLenum = 0x855C;
 
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     pub enum FogMode {
         EyeRadial = FOG_EYE_RADIAL_NV
     }
 
     #[repr(u32)]
+    #[derive(Copy, Clone)]
     pub enum FogEyePlane {
         Absolute = FOG_EYE_PLANE_ABSOLUTE_NV
     }

@@ -5,7 +5,7 @@ use crate::texture::TextureGuard;
 use bytemuck::NoUninit;
 use cgmath::{Matrix4, Vector1, Vector2, Vector3, Vector4};
 use std::ffi::c_void;
-
+use crate::state::{DrawParams, GraphicsContext};
 use super::gl;
 use super::gl::{GLenum, GLint};
 
@@ -65,9 +65,12 @@ pub mod formats {
     use crate::state::draw::DrawMode;
     use crate::{gl, matrix};
     use cgmath::{Matrix, Matrix4};
+    use crate::state::{DrawParams, GraphicsContext};
 
-    pub unsafe fn draw<V: Vertex>(mode: DrawMode, count: usize, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
+    pub unsafe fn draw<V: Vertex>(mode: DrawMode, count: usize, matrix: &Matrix4<f32>, params: &DrawParams, program: Option<&LinkedProgramId<V>>) {
         matrix::load(matrix, MatrixMode::ModelView);
+        let mut context = GraphicsContext::new();
+        params.apply(&mut context);
         gl::UseProgram(program.map_or(0, |p| p.id()));
         gl::DrawArrays(mode as _, 0, count as i32);
     }
@@ -93,13 +96,13 @@ pub trait Vertex: Sized + NoUninit {
     unsafe fn disable_client_state();
 
     #[inline(always)]
-    fn draw<S: VertexSource<Self>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<Self>>) {
+    fn draw<S: VertexSource<Self>>(source: S, mode: DrawMode, matrix: &Matrix4<f32>, params: &DrawParams, program: Option<&LinkedProgramId<Self>>) {
         let count = source.count();
         if count > 0 {
             let _guard = source.bind();
             unsafe {
                 Self::enable_client_state(source.start());
-                formats::draw(mode, count, matrix, program);
+                formats::draw(mode, count, matrix, params, program);
                 Self::disable_client_state();
             }
         }
@@ -275,17 +278,19 @@ impl ElementUsage {
 }
 
 #[inline]
-pub fn draw<V: Vertex, S: VertexSource<V>, D: DrawTarget>(mode: DrawMode, vertices: S, target: &mut D, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
+pub fn draw<V: Vertex, S: VertexSource<V>, D: DrawTarget>(mode: DrawMode, vertices: S, target: &mut D, matrix: &Matrix4<f32>, params: &DrawParams, program: Option<&LinkedProgramId<V>>) {
     let _guard = target.bind();
-    V::draw(vertices, mode, matrix, program)
+    
+    target.context().texture2d.disable();
+    V::draw(vertices, mode, matrix, params, program)
 }
 
 #[inline]
-pub fn draw_textured<'a, V: Vertex, S: VertexSource<V>, D: DrawTarget>(mode: DrawMode, vertices: S, target: &mut D, texture: &TextureGuard<'a>, matrix: &Matrix4<f32>, program: Option<&LinkedProgramId<V>>) {
+pub fn draw_textured<'a, V: Vertex, S: VertexSource<V>, D: DrawTarget>(mode: DrawMode, vertices: S, target: &mut D, texture: &TextureGuard<'a>, matrix: &Matrix4<f32>, params: &DrawParams, program: Option<&LinkedProgramId<V>>) {
     let _guard = target.bind();
 
-    texture.context().texture2d.enable();
-    V::draw(vertices, mode, matrix, program)
+    target.context().texture2d.enable();
+    V::draw(vertices, mode, matrix, params, program)
 }
 
 pub fn rgb(r: f32, g: f32, b: f32) -> [u8; 4] {
