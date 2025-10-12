@@ -1,7 +1,7 @@
 #![feature(decl_macro)]
 #![feature(adt_const_params)]
 #![feature(structural_match)]
-#![feature(concat_idents)]
+#![feature(macro_metavar_expr_concat)]
 #![feature(vec_into_raw_parts)]
 
 use std::ffi::c_void;
