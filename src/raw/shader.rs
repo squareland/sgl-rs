@@ -563,7 +563,7 @@ macro_rules! v {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
-                    (concat_idents!($glfn1, v))(location, self.len() as _, self.as_ptr());
+                    (${concat($glfn1, v)})(location, self.len() as _, self.as_ptr());
                 }
             }
         }
@@ -572,7 +572,7 @@ macro_rules! v {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
-                    (concat_idents!($glfn2, v))(location, self.len() as _, self.as_ptr().cast());
+                    (${concat($glfn2, v)})(location, self.len() as _, self.as_ptr().cast());
                 }
             }
         }
@@ -581,7 +581,7 @@ macro_rules! v {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
-                    (concat_idents!($glfn2, v))(location, self.len() as _, self.as_ptr().cast());
+                    (${concat($glfn2, v)})(location, self.len() as _, self.as_ptr().cast());
                 }
             }
         }
@@ -590,7 +590,7 @@ macro_rules! v {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
-                    (concat_idents!($glfn2, v))(location, self.len() as _, self.as_ptr().cast());
+                    (${concat($glfn2, v)})(location, self.len() as _, self.as_ptr().cast());
                 }
             }
         }
@@ -599,7 +599,7 @@ macro_rules! v {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
-                    (concat_idents!($glfn3, v))(location, self.len() as _, self.as_ptr().cast());
+                    (${concat($glfn3, v)})(location, self.len() as _, self.as_ptr().cast());
                 }
             }
         }
@@ -608,7 +608,7 @@ macro_rules! v {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
-                    (concat_idents!($glfn3, v))(location, self.len() as _, self.as_ptr().cast());
+                    (${concat($glfn3, v)})(location, self.len() as _, self.as_ptr().cast());
                 }
             }
         }
@@ -617,7 +617,7 @@ macro_rules! v {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
-                    (concat_idents!($glfn4, v))(location, self.len() as _, self.as_ptr().cast());
+                    (${concat($glfn4, v)})(location, self.len() as _, self.as_ptr().cast());
                 }
             }
         }
@@ -626,7 +626,7 @@ macro_rules! v {
             fn set(self, location: GLint) {
                 unsafe {
                     use gl::*;
-                    (concat_idents!($glfn4, v))(location, self.len() as _, self.as_ptr().cast());
+                    (${concat($glfn4, v)})(location, self.len() as _, self.as_ptr().cast());
                 }
             }
         }
