@@ -557,7 +557,7 @@ impl<'a> Texture<'a> for &'a TextureId {
         };
         TextureGuard {
             texture: self,
-            unit
+            unit: unit - gl::TEXTURE0 as GLint,
         }
     }
 }
@@ -572,7 +572,7 @@ impl<'a> Texture<'a> for &'a mut TextureId {
         }
         TextureGuard {
             texture: self,
-            unit
+            unit: unit - gl::TEXTURE0 as GLint,
         }
     }
 }

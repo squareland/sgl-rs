@@ -1,4 +1,5 @@
 use core::cmp::{Eq, PartialEq};
+use std::cell::RefCell;
 use std::ffi::{c_void, CStr};
 use crate::state::GraphicsContext;
 use super::gl;
@@ -95,39 +96,48 @@ impl GlError {
     }
 }
 
-type DebugCallback<'a> = dyn FnMut(DebugSource, DebugSeverity, DebugType, GlError, &'a CStr);
+type DebugCallback = dyn FnMut(DebugSource, DebugSeverity, DebugType, u32, &CStr) + 'static;
 
-pub fn enable<C>(callback: C) where C: FnMut(DebugSource, DebugSeverity, DebugType, GlError, &CStr) + 'static {
-    extern "system" fn debug_callback(source: GLenum,
-                                      gltype: GLenum,
-                                      id: GLuint,
-                                      severity: GLenum,
-                                      length: GLsizei,
-                                      message: *const GLchar,
-                                      callback: *mut c_void) {
+thread_local! {
+    static CALLBACK: RefCell<Option<Box<Box<DebugCallback>>>> = RefCell::new(None);
+}
 
+pub fn enable<C>(callback: C) where C: FnMut(DebugSource, DebugSeverity, DebugType, u32, &CStr) + 'static {
+    extern "system" fn debug_callback(
+        source: GLenum,
+        gltype: GLenum,
+        id: GLuint,
+        severity: GLenum,
+        _length: GLsizei,
+        message: *const GLchar,
+        user_data: *mut c_void,
+    ) {
         unsafe {
-            let callback = callback.cast::<Box<DebugCallback>>();
+            let callback = user_data.cast::<Box<DebugCallback>>();
             if let Some(callback) = callback.as_mut() {
-                let source = DebugSource::from(source);
-                let ty = DebugType::from(gltype);
-                let severity = DebugSeverity::from(severity);
-                let id = GlError::from(id);
-
-                let message: &[u8] = std::slice::from_raw_parts(message.cast(), length as _);
-                let message = CStr::from_bytes_with_nul_unchecked(message);
-
-                callback(source, severity, ty, id, message);
+                let message = CStr::from_ptr(message);
+                callback(
+                    DebugSource::from(source),
+                    DebugSeverity::from(severity),
+                    DebugType::from(gltype),
+                    id,
+                    message,
+                );
             }
         }
     }
 
-    let callback: Box<Box<DebugCallback>> = Box::new(Box::new(callback));
+    let boxed: Box<Box<DebugCallback>> = Box::new(Box::new(callback));
+    let raw = Box::into_raw(boxed);
 
     unsafe {
         gl::Enable(gl::DEBUG_OUTPUT);
-        gl::DebugMessageCallback(Some(debug_callback), Box::into_raw(callback).cast());
+        gl::DebugMessageCallback(Some(debug_callback), raw.cast());
     }
+
+    CALLBACK.with(|cell| {
+        *cell.borrow_mut() = Some(unsafe { Box::from_raw(raw) });
+    });
 }
 
 impl GraphicsContext {

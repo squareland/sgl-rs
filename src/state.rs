@@ -1,6 +1,5 @@
 use std::ffi::CStr;
 use std::marker::PhantomData;
-use std::mem::transmute;
 use std::num::NonZeroU32;
 use cgmath::{Array, Vector3, Vector4};
 use enumflags2::{bitflags, BitFlags};
@@ -146,10 +145,10 @@ impl DrawParams {
                 context.fog_eye_plane_nv(nv.eye_plane);
             }
             context.color_material(Face::Front, ColorMode::Ambient);
-            context.color(fog.color.x, fog.color.y, fog.color.z, fog.color.z);
+            context.color(fog.color.x, fog.color.y, fog.color.z, fog.color.w);
             context.color_material.enable();
             context.fog.enable();
-            context.color(fog.color.x, fog.color.y, fog.color.z, fog.color.z);
+            context.color(fog.color.x, fog.color.y, fog.color.z, fog.color.w);
         } else {
             context.fog.disable();
             context.color(self.color.x, self.color.y, self.color.z, self.color.w);
@@ -441,7 +440,7 @@ impl GraphicsContext {
         unsafe {
             let reference = func.reference();
             let mask = func.mask();
-            let ord = transmute(std::mem::discriminant(&func));
+            let ord = func.gl_func();
             gl::StencilFunc(ord, reference as _, mask);
         }
     }
@@ -451,7 +450,7 @@ impl GraphicsContext {
         unsafe {
             let reference = func.reference();
             let mask = func.mask();
-            let ord = transmute(std::mem::discriminant(&func));
+            let ord = func.gl_func();
             gl::StencilFuncSeparate(face as _, ord, reference as _, mask);
         }
     }
@@ -508,7 +507,7 @@ impl GraphicsContext {
     pub fn alpha_func(&self, func: AlphaFunc) {
         unsafe {
             let reference = func.reference();
-            let ord = transmute(std::mem::discriminant(&func));
+            let ord = func.gl_func();
             gl::AlphaFunc(ord, reference);
         }
     }
@@ -682,6 +681,19 @@ pub mod stencil {
     }
 
     impl StencilFunc {
+        pub fn gl_func(&self) -> u32 {
+            match self {
+                StencilFunc::Always => gl::ALWAYS,
+                StencilFunc::Never => gl::NEVER,
+                StencilFunc::Less { .. } => gl::LESS,
+                StencilFunc::LessOrEqual { .. } => gl::LEQUAL,
+                StencilFunc::Greater { .. } => gl::GREATER,
+                StencilFunc::GreaterOrEqual { .. } => gl::GEQUAL,
+                StencilFunc::Equal { .. } => gl::EQUAL,
+                StencilFunc::NotEqual { .. } => gl::NOTEQUAL,
+            }
+        }
+
         pub fn reference(&self) -> u32 {
             match self {
                 StencilFunc::Always => 0,
@@ -750,6 +762,19 @@ pub mod alpha {
     }
 
     impl AlphaFunc {
+        pub fn gl_func(&self) -> u32 {
+            match self {
+                AlphaFunc::Always => gl::ALWAYS,
+                AlphaFunc::Never => gl::NEVER,
+                AlphaFunc::Less(_) => gl::LESS,
+                AlphaFunc::LessOrEqual(_) => gl::LEQUAL,
+                AlphaFunc::Greater(_) => gl::GREATER,
+                AlphaFunc::GreaterOrEqual(_) => gl::GEQUAL,
+                AlphaFunc::Equal(_) => gl::EQUAL,
+                AlphaFunc::NotEqual(_) => gl::NOTEQUAL,
+            }
+        }
+
         #[inline(always)]
         pub fn reference(&self) -> f32 {
             match self {
